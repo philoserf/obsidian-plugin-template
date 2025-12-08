@@ -21,7 +21,7 @@ const external = [
   ...builtinModules,
 ];
 
-async function build() {
+async function build(): Promise<void> {
   const result = await Bun.build({
     entrypoints: ["src/main.ts"],
     outdir: "dist",

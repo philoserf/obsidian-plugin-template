@@ -1,6 +1,6 @@
 import { Plugin, PluginSettingTab } from "obsidian";
 
-interface PluginSettings {}
+type PluginSettings = Record<string, never>;
 
 const DEFAULT_SETTINGS: PluginSettings = {};
 

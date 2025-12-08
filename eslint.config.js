@@ -14,6 +14,7 @@ export default [
         project: "./tsconfig.json",
       },
       globals: {
+        Bun: "readonly",
         console: "readonly",
         process: "readonly",
       },
