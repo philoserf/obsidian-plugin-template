@@ -3,9 +3,16 @@
   "version": "1.0.0",
   "description": "A minimal template for Obsidian plugins using Bun",
   "main": "dist/main.js",
+  "type": "module",
   "scripts": {
-    "dev": "bun run build --watch",
-    "build": "bun run build.ts",
+    "dev": "bun run build.ts --watch",
+    "build": "bun run check && bun run build.ts",
+    "check": "bun run typecheck && bun run lint && bun run format:check",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint . && markdownlint-cli2 '**/*.md'",
+    "lint:fix": "eslint . --fix && markdownlint-cli2 --fix '**/*.md'",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
     "version": "bun run version-bump.ts"
   },
   "keywords": [
@@ -16,10 +23,14 @@
   "author": "",
   "license": "MIT",
   "devDependencies": {
-    "@types/node": "^20.11.5",
-    "builtin-modules": "^3.3.0",
-    "esbuild": "^0.20.0",
-    "obsidian": "latest",
-    "typescript": "^5.3.3"
+    "@eslint/js": "9.17.0",
+    "@types/node": "20.19.1",
+    "@typescript-eslint/eslint-plugin": "8.18.1",
+    "@typescript-eslint/parser": "8.18.1",
+    "eslint": "9.17.0",
+    "markdownlint-cli2": "0.14.0",
+    "obsidian": "1.7.7",
+    "prettier": "3.4.2",
+    "typescript": "5.7.2"
   }
 }

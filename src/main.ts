@@ -1,41 +1,22 @@
-import { App, Plugin, PluginSettingTab, Setting } from "obsidian";
+import { Plugin, PluginSettingTab } from "obsidian";
 
-interface PluginSettings {
-  exampleSetting: string;
-}
+interface PluginSettings {}
 
-const DEFAULT_SETTINGS: PluginSettings = {
-  exampleSetting: "default",
-};
+const DEFAULT_SETTINGS: PluginSettings = {};
 
 export default class ExamplePlugin extends Plugin {
-  settings: PluginSettings;
+  settings: PluginSettings = DEFAULT_SETTINGS;
 
-  async onload() {
+  async onload(): Promise<void> {
     await this.loadSettings();
-
-    // Add a simple command
-    this.addCommand({
-      id: "example-command",
-      name: "Example command",
-      callback: () => {
-        console.log("Example command executed");
-      },
-    });
-
-    // Add settings tab
     this.addSettingTab(new ExampleSettingTab(this.app, this));
   }
 
-  onunload() {
-    console.log("Unloading plugin");
-  }
-
-  async loadSettings() {
+  async loadSettings(): Promise<void> {
     this.settings = Object.assign({}, DEFAULT_SETTINGS, await this.loadData());
   }
 
-  async saveSettings() {
+  async saveSettings(): Promise<void> {
     await this.saveData(this.settings);
   }
 }
@@ -43,26 +24,12 @@ export default class ExamplePlugin extends Plugin {
 class ExampleSettingTab extends PluginSettingTab {
   plugin: ExamplePlugin;
 
-  constructor(app: App, plugin: ExamplePlugin) {
+  constructor(app: Plugin["app"], plugin: ExamplePlugin) {
     super(app, plugin);
     this.plugin = plugin;
   }
 
   display(): void {
-    const { containerEl } = this;
-    containerEl.empty();
-
-    new Setting(containerEl)
-      .setName("Example setting")
-      .setDesc("This is an example setting")
-      .addText((text) =>
-        text
-          .setPlaceholder("Enter value")
-          .setValue(this.plugin.settings.exampleSetting)
-          .onChange(async (value) => {
-            this.plugin.settings.exampleSetting = value;
-            await this.plugin.saveSettings();
-          })
-      );
+    this.containerEl.empty();
   }
 }
