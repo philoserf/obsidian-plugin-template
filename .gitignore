@@ -1,0 +1,25 @@
+# Build output
+dist/
+*.js.map
+
+# Dependencies
+node_modules/
+
+# Bun
+.bun/
+bun.lockb
+
+# Environment
+.env
+.env.local
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
