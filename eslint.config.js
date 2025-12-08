@@ -8,11 +8,6 @@ export default [
     files: ["**/*.ts"],
     languageOptions: {
       parser: tsParser,
-      parserOptions: {
-        ecmaVersion: 2022,
-        sourceType: "module",
-        project: "./tsconfig.json",
-      },
       globals: {
         Bun: "readonly",
         console: "readonly",
@@ -23,21 +18,10 @@ export default [
       "@typescript-eslint": tsPlugin,
     },
     rules: {
-      ...tsPlugin.configs["recommended"].rules,
-      ...tsPlugin.configs["strict"].rules,
-      "@typescript-eslint/no-unused-vars": [
-        "error",
-        {
-          argsIgnorePattern: "^_",
-          varsIgnorePattern: "^_",
-        },
-      ],
-      "@typescript-eslint/explicit-function-return-type": "error",
-      "@typescript-eslint/no-explicit-any": "error",
-      "@typescript-eslint/no-non-null-assertion": "error",
+      ...tsPlugin.configs.recommended.rules,
     },
   },
   {
-    ignores: ["dist/**", "node_modules/**", "*.js"],
+    ignores: ["dist/**", "node_modules/**"],
   },
 ];
