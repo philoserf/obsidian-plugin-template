@@ -9,8 +9,8 @@
     "build": "bun run check && bun run build.ts",
     "check": "bun run typecheck && bun run lint && bun run format:check",
     "typecheck": "tsc --noEmit",
-    "lint": "eslint . && markdownlint-cli2 '**/*.md'",
-    "lint:fix": "eslint . --fix && markdownlint-cli2 --fix '**/*.md'",
+    "lint": "eslint . && markdownlint '**/*.md'",
+    "lint:fix": "eslint . --fix && markdownlint --fix '**/*.md'",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "version": "bun run version-bump.ts"
@@ -28,8 +28,8 @@
     "@typescript-eslint/eslint-plugin": "8.18.1",
     "@typescript-eslint/parser": "8.18.1",
     "eslint": "9.17.0",
-    "markdownlint-cli2": "0.14.0",
-    "obsidian": "1.7.7",
+    "markdownlint-cli": "0.43.0",
+    "obsidian": "1.10.3",
     "prettier": "3.4.2",
     "typescript": "5.7.2"
   }
