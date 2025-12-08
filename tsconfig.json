@@ -15,5 +15,5 @@
       "*": ["src/*"]
     }
   },
-  "include": ["src/**/*.ts"]
+  "include": ["src/**/*.ts", "build.ts", "version-bump.ts"]
 }
