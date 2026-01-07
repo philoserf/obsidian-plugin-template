@@ -15,3 +15,19 @@ updates:
       prefix: "chore"
       prefix-scope: "deps"
       include: "scope"
+
+  - package-ecosystem: github-actions
+    directory: "/"
+    schedule:
+      interval: weekly
+      day: monday
+      time: "03:00"
+    open-pull-requests-limit: 10
+    reviewers:
+      - philoserf
+    assignees:
+      - philoserf
+    commit-message:
+      prefix: "chore"
+      prefix-scope: "ci"
+      include: "scope"
