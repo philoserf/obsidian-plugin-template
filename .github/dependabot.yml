@@ -1,0 +1,17 @@
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: "/"
+    schedule:
+      interval: weekly
+      day: monday
+      time: "03:00"
+    open-pull-requests-limit: 10
+    reviewers:
+      - philoserf
+    assignees:
+      - philoserf
+    commit-message:
+      prefix: "chore"
+      prefix-scope: "deps"
+      include: "scope"
