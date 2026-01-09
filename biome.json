@@ -8,11 +8,15 @@
   "files": {
     "ignoreUnknown": false,
     "includes": [
-      "**",
-      "!**/dist",
-      "!**/node_modules",
-      "!**/*.min.js",
-      "!**/bun.lock"
+      "**/*.ts",
+      "**/*.js",
+      "**/*.json"
+    ],
+    "ignore": [
+      "dist",
+      "node_modules",
+      "*.min.js",
+      "bun.lock"
     ]
   },
   "formatter": {
