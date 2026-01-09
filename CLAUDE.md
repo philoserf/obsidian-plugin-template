@@ -26,9 +26,9 @@ bun run build   # Production build (runs check first)
 ```bash
 bun run check         # Run all checks (typecheck + lint + format check)
 bun run typecheck     # TypeScript type checking only
-bun run lint          # ESLint and markdownlint
+bun run lint          # Biome linting and markdownlint
 bun run lint:fix      # Auto-fix linting issues
-bun run format        # Format code with Prettier
+bun run format        # Format code with Biome
 bun run format:check  # Check formatting without changes
 ```
 
@@ -59,7 +59,7 @@ bun run version  # Update manifest.json and versions.json from package.json vers
 - **[manifest.json](manifest.json)**: Obsidian plugin metadata (update before publishing)
 - **[versions.json](versions.json)**: Maps plugin versions to minimum Obsidian versions
 - **[tsconfig.json](tsconfig.json)**: TypeScript compiler options (noEmit mode, strict checking)
-- **[eslint.config.js](eslint.config.js)**: Flat config format with TypeScript support
+- **[biome.json](biome.json)**: Biome configuration for linting and formatting
 
 ### Version Management
 
