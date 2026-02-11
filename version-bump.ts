@@ -1,3 +1,8 @@
+/**
+ * @file This script automates the version bumping process for the Obsidian plugin.
+ * It reads the version from `package.json` and updates `manifest.json` and
+ * `versions.json` accordingly, ensuring consistency across plugin metadata files.
+ */
 import { readFileSync, writeFileSync } from "node:fs";
 
 const targetVersion = process.env.npm_package_version;
