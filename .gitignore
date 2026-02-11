@@ -1,5 +1,5 @@
 # Build output
-dist/
+main.js
 *.js.map
 
 # Dependencies
