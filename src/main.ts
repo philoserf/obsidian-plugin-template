@@ -1,4 +1,5 @@
-import { Plugin, PluginSettingTab } from "obsidian";
+import { Plugin, PluginSettingTab, Notice } from "obsidian";
+import { greet } from "./utils";
 
 type PluginSettings = Record<string, never>;
 
@@ -9,6 +10,28 @@ export default class ExamplePlugin extends Plugin {
 
   async onload(): Promise<void> {
     await this.loadSettings();
+
+    // This adds a simple command that can be triggered by the user (e.g., from the Command Palette).
+    this.addCommand({
+      id: "greet-command",
+      name: "Greet the user",
+      callback: () => {
+        new Notice(greet("Obsidian User"));
+      },
+    });
+
+    // This adds a ribbon icon to the left ribbon.
+    const ribbonIconEl = this.addRibbonIcon(
+      "bell",
+      "Greet via Ribbon Icon",
+      (_evt: MouseEvent) => {
+        // Called when the user clicks the icon.
+        new Notice(greet("Ribbon Clicker"));
+      },
+    );
+    // Perform some extra configuration on the ribbon icon element if necessary.
+    ribbonIconEl.addClass("my-plugin-ribbon-class");
+
     this.addSettingTab(new ExampleSettingTab(this.app, this));
   }
 
