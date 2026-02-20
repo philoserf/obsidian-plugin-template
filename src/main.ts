@@ -1,4 +1,4 @@
-import { Plugin, PluginSettingTab, Notice } from "obsidian";
+import { Notice, Plugin, PluginSettingTab } from "obsidian";
 import { greet } from "./utils";
 
 type PluginSettings = Record<string, never>;

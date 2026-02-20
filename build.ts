@@ -1,9 +1,3 @@
-/**
- * @file This script uses Bun to bundle the Obsidian plugin.
- * It handles conditional minification for production builds and
- * externalizes Obsidian and Electron dependencies.
- * It supports a --watch flag for development mode.
- */
 const watch = process.argv.includes("--watch");
 
 const result = await Bun.build({
