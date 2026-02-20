@@ -2,9 +2,9 @@
   "id": "your-plugin-id",
   "name": "Your Plugin Name",
   "version": "1.0.0",
-  "minAppVersion": "0.15.0",
+  "minAppVersion": "1.0.0",
   "description": "A brief description of your plugin",
-  "author": "Your Name",
-  "authorUrl": "https://github.com/yourusername",
+  "author": "Mark Ayers",
+  "authorUrl": "https://github.com/philoserf",
   "isDesktopOnly": false
 }

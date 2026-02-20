@@ -8,10 +8,5 @@
     "strict": true,
     "skipLibCheck": true
   },
-  "include": [
-    "src/**/*.ts",
-    "src/__tests__/**/*.ts",
-    "build.ts",
-    "version-bump.ts"
-  ]
+  "include": ["src/**/*.ts", "build.ts", "version-bump.ts"]
 }

@@ -12,13 +12,15 @@ Minimal template for Obsidian plugins using Bun as the build tool and runtime.
 bun install              # Install dependencies
 bun run dev              # Watch mode with auto-rebuild
 bun run build            # Production build (runs check first)
-bun run check            # Run all checks (typecheck + lint + format check)
+bun run check            # Run all checks (typecheck + biome)
 bun run typecheck        # TypeScript type checking only
-bun run lint             # Biome linting and markdownlint
-bun run lint:fix         # Auto-fix linting issues
+bun run lint             # Biome lint + format check
+bun run lint:fix         # Auto-fix lint and format issues
 bun run format           # Format code with Biome
 bun run format:check     # Check formatting without changes
+bun run validate         # Full validation (types, checks, build, output)
 bun run version          # Sync package.json version → manifest.json + versions.json
+bun test                 # Run tests
 ```
 
 ## Architecture
@@ -49,3 +51,9 @@ git push origin 1.0.0
 ```
 
 The workflow builds the plugin and uploads `main.js` and `manifest.json` as release assets.
+
+Pre-release: run `bun run validate`.
+
+## Code Style
+
+Enforced by Biome (`biome.json`): 2-space indent, organized imports, git-aware VCS integration. Run `bun run format` or `bun run lint:fix` to auto-fix.
