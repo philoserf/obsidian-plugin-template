@@ -5,11 +5,11 @@
     "": {
       "name": "obsidian-plugin-template",
       "devDependencies": {
-        "@biomejs/biome": "latest",
-        "@types/bun": "latest",
-        "@types/node": "latest",
-        "obsidian": "latest",
-        "typescript": "latest",
+        "@biomejs/biome": "^2.4.3",
+        "@types/bun": "^1.3.9",
+        "@types/node": "^25.3.0",
+        "obsidian": "^1.12.2",
+        "typescript": "^5.9.3",
       },
     },
   },
