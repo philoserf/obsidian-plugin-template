@@ -24,14 +24,12 @@ find . -not -path "./node_modules/*" -not -path "./.git/*" -not -path "./.bun/*"
 ./.github/dependabot.yml
 ./.github/settings.yml
 ./.github/workflows
-./.github/workflows/dependabot.yml
-./.github/workflows/jekyll-gh-pages.yml
 ./.github/workflows/main.yml
 ./.github/workflows/release.yml
 ./.gitignore
-./AGENTS.md
 ./biome.json
 ./build.ts
+./CHANGELOG.md
 ./CLAUDE.md
 ./LICENSE
 ./main.js
@@ -42,8 +40,7 @@ find . -not -path "./node_modules/*" -not -path "./.git/*" -not -path "./.bun/*"
 ./scripts
 ./scripts/validate-plugin.ts
 ./src
-./src/__tests__
-./src/__tests__/main.test.ts
+./src/main.test.ts
 ./src/main.ts
 ./src/utils.ts
 ./tsconfig.json
@@ -190,17 +187,7 @@ cat -n src/__tests__/main.test.ts
 ```
 
 ```output
-     1	import { expect, test } from "bun:test";
-     2	import { greet } from "../utils";
-     3	
-     4	test("greet function returns a greeting", () => {
-     5	  expect(greet("World")).toBe("Hello, World!");
-     6	  expect(greet("Obsidian")).toBe("Hello, Obsidian!");
-     7	});
-     8	
-     9	test("greet function handles empty string", () => {
-    10	  expect(greet("")).toBe("Hello, !");
-    11	});
+cat: src/__tests__/main.test.ts: No such file or directory
 ```
 
 Two tests, both passing. They only cover `greet()` from `utils.ts` — the plugin class itself has no test coverage. This is a known gap (see issue #29).
@@ -282,30 +269,25 @@ cat -n version-bump.ts
 ```
 
 ```output
-     1	/**
-     2	 * @file This script automates the version bumping process for the Obsidian plugin.
-     3	 * It reads the version from `package.json` and updates `manifest.json` and
-     4	 * `versions.json` accordingly, ensuring consistency across plugin metadata files.
-     5	 */
-     6	import { readFileSync, writeFileSync } from "node:fs";
+     1	import { readFileSync, writeFileSync } from "node:fs";
+     2	
+     3	const targetVersion = process.env.npm_package_version;
+     4	if (!targetVersion) {
+     5	  throw new Error("No version found in package.json");
+     6	}
      7	
-     8	const targetVersion = process.env.npm_package_version;
-     9	if (!targetVersion) {
-    10	  throw new Error("No version found in package.json");
-    11	}
-    12	
-    13	// Update manifest.json
-    14	const manifest = JSON.parse(readFileSync("manifest.json", "utf8"));
-    15	const { minAppVersion } = manifest;
-    16	manifest.version = targetVersion;
-    17	writeFileSync("manifest.json", `${JSON.stringify(manifest, null, 2)}\n`);
+     8	// Update manifest.json
+     9	const manifest = JSON.parse(readFileSync("manifest.json", "utf8"));
+    10	const { minAppVersion } = manifest;
+    11	manifest.version = targetVersion;
+    12	writeFileSync("manifest.json", `${JSON.stringify(manifest, null, 2)}\n`);
+    13	
+    14	// Update versions.json
+    15	const versions = JSON.parse(readFileSync("versions.json", "utf8"));
+    16	versions[targetVersion] = minAppVersion;
+    17	writeFileSync("versions.json", `${JSON.stringify(versions, null, 2)}\n`);
     18	
-    19	// Update versions.json
-    20	const versions = JSON.parse(readFileSync("versions.json", "utf8"));
-    21	versions[targetVersion] = minAppVersion;
-    22	writeFileSync("versions.json", `${JSON.stringify(versions, null, 2)}\n`);
-    23	
-    24	console.log(`Updated to version ${targetVersion}`);
+    19	console.log(`Updated to version ${targetVersion}`);
 ```
 
 ### How it works
@@ -465,8 +447,9 @@ cat -n tsconfig.json
      8	    "strict": true,
      9	    "skipLibCheck": true
     10	  },
-    11	  "include": ["src/**/*.ts", "build.ts", "version-bump.ts"]
-    12	}
+    11	  "include": ["src/**/*.ts", "build.ts", "version-bump.ts"],
+    12	  "exclude": ["src/**/*.test.ts"]
+    13	}
 ```
 
 Key choices:
@@ -528,20 +511,20 @@ sed -n "7,20p" package.json | cat -n
 ```
 
 ```output
-     1	  "scripts": {
-     2	    "dev": "bun run build.ts --watch",
-     3	    "build": "bun run check && bun run build.ts",
-     4	    "check": "bun run typecheck && biome check .",
-     5	    "typecheck": "tsc --noEmit",
-     6	    "lint": "biome check .",
-     7	    "lint:fix": "biome check --write .",
-     8	    "format": "biome format --write .",
-     9	    "format:check": "biome format .",
-    10	    "validate": "bun run scripts/validate-plugin.ts",
-    11	    "version": "bun run version-bump.ts",
-    12	    "test": "bun test",
-    13	    "deploy": "echo 'Update this path: cp main.js manifest.json ~/path/to/vault/.obsidian/plugins/your-plugin/'"
-    14	  },
+     1	  "license": "MIT",
+     2	  "scripts": {
+     3	    "audit": "bun audit --audit-level=critical",
+     4	    "dev": "bun run build.ts --watch",
+     5	    "build": "bun run check && bun run build.ts",
+     6	    "check": "bun run typecheck && biome check .",
+     7	    "typecheck": "tsc --noEmit",
+     8	    "lint": "biome check .",
+     9	    "lint:fix": "biome check --write .",
+    10	    "format": "biome format --write .",
+    11	    "format:check": "biome format .",
+    12	    "validate": "bun run scripts/validate-plugin.ts",
+    13	    "version": "bun run version-bump.ts",
+    14	    "test": "bun test",
 ```
 
 The script dependency chain:
@@ -606,7 +589,9 @@ cat -n .github/workflows/main.yml
     17	          bun-version: latest
     18	
     19	      - run: bun install
-    20	      - run: bun run check
+    20	      - run: bun audit --audit-level=critical
+    21	      - run: bun run check
+    22	      - run: bun test
 ```
 
 Minimal and correct. Runs on push to `main` and on PRs targeting `main`. Uses `oven-sh/setup-bun@v2` with `latest` version, then runs `check` (typecheck + biome).
@@ -627,29 +612,32 @@ cat -n .github/workflows/release.yml
      5	    tags:
      6	      - "*"
      7	
-     8	jobs:
-     9	  build:
-    10	    runs-on: ubuntu-latest
-    11	    steps:
-    12	      - uses: actions/checkout@v6
-    13	
-    14	      - uses: oven-sh/setup-bun@v2
-    15	        with:
-    16	          bun-version: latest
-    17	
-    18	      - run: |
-    19	          bun install
-    20	          bun run build
-    21	
-    22	      - name: Create release
-    23	        uses: softprops/action-gh-release@v2
-    24	        with:
-    25	          files: |
-    26	            main.js
-    27	            manifest.json
-    28	          fail_on_unmatched_files: true
-    29	        env:
-    30	          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+     8	permissions:
+     9	  contents: write
+    10	
+    11	jobs:
+    12	  build:
+    13	    runs-on: ubuntu-latest
+    14	    steps:
+    15	      - uses: actions/checkout@v6
+    16	
+    17	      - uses: oven-sh/setup-bun@v2
+    18	        with:
+    19	          bun-version: latest
+    20	
+    21	      - run: |
+    22	          bun install
+    23	          bun run build
+    24	
+    25	      - name: Create release
+    26	        uses: softprops/action-gh-release@v2
+    27	        with:
+    28	          files: |
+    29	            main.js
+    30	            manifest.json
+    31	          fail_on_unmatched_files: true
+    32	        env:
+    33	          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 ```
 
 Triggered by any tag push (`tags: ["*"]`). Builds the plugin with `bun run build` (which runs `check` first), then creates a GitHub Release with `main.js` and `manifest.json` as assets using `softprops/action-gh-release@v2`.
@@ -665,50 +653,7 @@ cat -n .github/workflows/dependabot.yml
 ```
 
 ```output
-     1	name: Dependabot
-     2	
-     3	on:
-     4	  pull_request:
-     5	    types: [opened, synchronize, reopened]
-     6	  pull_request_target:
-     7	    types: [opened, synchronize, reopened]
-     8	
-     9	permissions:
-    10	  pull-requests: write
-    11	  contents: write
-    12	
-    13	jobs:
-    14	  dependabot:
-    15	    if: github.actor == 'dependabot[bot]'
-    16	    runs-on: ubuntu-latest
-    17	    steps:
-    18	      - name: Checkout code
-    19	        uses: actions/checkout@v6
-    20	        with:
-    21	          fetch-depth: 0
-    22	
-    23	      - name: Setup Node.js
-    24	        uses: actions/setup-node@v4
-    25	        with:
-    26	          node-version: '20'
-    27	
-    28	      - name: Install dependencies
-    29	        run: bun install
-    30	
-    31	      - name: Run checks
-    32	        run: bun run check
-    33	
-    34	      - name: Approve PR
-    35	        if: always()
-    36	        run: gh pr review --approve "${{ github.event.pull_request.number }}"
-    37	        env:
-    38	          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-    39	
-    40	      - name: Enable auto-merge
-    41	        if: always()
-    42	        run: gh pr merge --auto --squash "${{ github.event.pull_request.number }}"
-    43	        env:
-    44	          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+cat: .github/workflows/dependabot.yml: No such file or directory
 ```
 
 ### Concerns
@@ -863,4 +808,3 @@ The main divergence from community norms is using Bun instead of the Node/esbuil
 ---
 
 Open issues for tracked concerns: #25, #26, #27, #28, #29, #30.
-
