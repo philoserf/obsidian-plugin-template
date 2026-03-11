@@ -3,7 +3,8 @@
   "version": "1.0.0",
   "description": "A minimal template for Obsidian plugins using Bun",
   "main": "main.js",
-  "type": "module",
+  "author": "Mark Ayers",
+  "license": "MIT",
   "scripts": {
     "audit": "bun audit --audit-level=critical",
     "dev": "bun run build.ts --watch",
@@ -19,8 +20,6 @@
     "test": "bun test",
     "deploy": "echo 'Update this path: cp main.js manifest.json ~/path/to/vault/.obsidian/plugins/your-plugin/'"
   },
-  "author": "Mark Ayers",
-  "license": "MIT",
   "devDependencies": {
     "@biomejs/biome": "^2.4.6",
     "@types/bun": "^1.3.10",
