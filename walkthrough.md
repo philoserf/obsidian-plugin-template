@@ -1,739 +1,466 @@
-# Obsidian Plugin Template — Code Walkthrough
+# Obsidian Plugin Template Walkthrough
 
-*2026-03-09T04:05:41Z by Showboat 0.6.1*
-<!-- showboat-id: 92e7f9cc-7d6f-40f5-b587-add89ffe53a3 -->
+*2026-04-03T18:42:01Z by Showboat 0.6.1*
+<!-- showboat-id: 256f4d93-f6cb-4a26-99c3-b4553ecac91b -->
 
 ## Overview
 
-This is a minimal GitHub template for building Obsidian plugins with Bun. The codebase is small — roughly 200 lines of TypeScript across six files — but it covers the full lifecycle: source, build, test, lint, version management, validation, and CI/CD release.
+A minimal Obsidian plugin template that uses **Bun** as the build tool and runtime, **Biome** for linting and formatting, and **TypeScript** in strict mode. The template provides a working plugin skeleton with a command, ribbon icon, settings tab, and a complete CI/release pipeline via GitHub Actions.
 
-The walkthrough follows the data flow: source → build → output → release.
+**Version:** 1.0.1  
+**Entry point:** `src/main.ts` → bundled to `main.js` (CommonJS)  
+**Key technologies:** Bun, TypeScript 6, Biome, Obsidian API
 
----
-
-## Project Structure
+## Architecture
 
 ```bash
-find . -not -path "./node_modules/*" -not -path "./.git/*" -not -path "./.bun/*" -not -path "./.claude/*" -not -name "bun.lock" -not -name "walkthrough.md" | sort
+cat <<'HEREDOC'
+.
+├── src/
+│   ├── main.ts          # Plugin class — entry point
+│   ├── utils.ts          # Shared utility functions
+│   └── main.test.ts      # Bun test suite
+├── build.ts              # Bun bundler script
+├── version-bump.ts       # Syncs version across manifest files
+├── main.js               # Built output (committed, required by Obsidian)
+├── manifest.json         # Obsidian plugin manifest
+├── versions.json         # Version → minAppVersion mapping
+├── package.json          # Scripts, dependencies, metadata
+├── tsconfig.json         # TypeScript config (strict, ESNext, bundler resolution)
+├── biome.json            # Biome formatter + linter config
+└── .github/
+    ├── workflows/
+    │   ├── main.yml      # CI: check + test on push/PR
+    │   └── release.yml   # Release: build + publish on tag push
+    ├── dependabot.yml    # Weekly dependency updates
+    └── settings.yml      # Repo settings (template repo)
+HEREDOC
+
 ```
 
 ```output
 .
-./.git
-./.github
-./.github/dependabot.yml
-./.github/settings.yml
-./.github/workflows
-./.github/workflows/claude-code-review.yml
-./.github/workflows/claude.yml
-./.github/workflows/main.yml
-./.github/workflows/release.yml
-./.gitignore
-./biome.json
-./build.ts
-./CHANGELOG.md
-./CLAUDE.md
-./LICENSE
-./main.js
-./manifest.json
-./node_modules
-./package.json
-./README.md
-./src
-./src/main.test.ts
-./src/main.ts
-./src/utils.ts
-./tsconfig.json
-./version-bump.ts
-./versions.json
+├── src/
+│   ├── main.ts          # Plugin class — entry point
+│   ├── utils.ts          # Shared utility functions
+│   └── main.test.ts      # Bun test suite
+├── build.ts              # Bun bundler script
+├── version-bump.ts       # Syncs version across manifest files
+├── main.js               # Built output (committed, required by Obsidian)
+├── manifest.json         # Obsidian plugin manifest
+├── versions.json         # Version → minAppVersion mapping
+├── package.json          # Scripts, dependencies, metadata
+├── tsconfig.json         # TypeScript config (strict, ESNext, bundler resolution)
+├── biome.json            # Biome formatter + linter config
+└── .github/
+    ├── workflows/
+    │   ├── main.yml      # CI: check + test on push/PR
+    │   └── release.yml   # Release: build + publish on tag push
+    ├── dependabot.yml    # Weekly dependency updates
+    └── settings.yml      # Repo settings (template repo)
 ```
 
-Key groupings:
+Data flows from `src/main.ts` through Bun's bundler (`build.ts`) into `main.js`. Obsidian loads `main.js` at runtime, reading `manifest.json` for metadata. The `versions.json` file maps plugin versions to minimum Obsidian versions for compatibility checking.
 
-| Path | Purpose |
-|------|---------|
-| `src/main.ts` | Plugin entry point — Obsidian lifecycle |
-| `src/utils.ts` | Shared utilities (testable, framework-free) |
-| `src/__tests__/main.test.ts` | Bun-native test suite |
-| `build.ts` | Bun bundler configuration |
-| `version-bump.ts` | Syncs version across metadata files |
-| `scripts/validate-plugin.ts` | Pre-release validation |
-| `manifest.json` / `versions.json` | Obsidian plugin metadata |
-| `package.json` / `tsconfig.json` / `biome.json` | Toolchain configuration |
-| `.github/workflows/` | CI, release, Dependabot, GitHub Pages |
+## Plugin Entry Point — `src/main.ts`
 
----
-
-## 1. The Plugin Source — `src/utils.ts`
-
-We start here because it's the simplest file and the only one with test coverage. It has zero framework dependencies.
+The plugin class `ExamplePlugin` extends `Plugin` from the Obsidian API. It registers a command, a ribbon icon, and a settings tab during `onload()`. Settings are currently an empty record — a placeholder for future configuration.
 
 ```bash
-cat -n src/utils.ts
+head -9 src/main.ts
 ```
 
 ```output
-     1	/**
-     2	 * A simple utility function to demonstrate testing and basic plugin functionality.
-     3	 * @param name The name to greet.
-     4	 * @returns A greeting string.
-     5	 */
-     6	export function greet(name: string): string {
-     7	  return `Hello, ${name}!`;
-     8	}
+import { Notice, Plugin, PluginSettingTab } from "obsidian";
+import { greet } from "./utils";
+
+type PluginSettings = Record<string, never>;
+
+const DEFAULT_SETTINGS: PluginSettings = {};
+
+export default class ExamplePlugin extends Plugin {
+  settings: PluginSettings = DEFAULT_SETTINGS;
 ```
 
-A single exported function. The JSDoc is useful here since this is a template — users will replace it, and the doc shows the expected pattern. The function takes a `string` and returns a `string`; no null checks, no edge-case handling. For a template placeholder, that's fine.
+The plugin imports `Notice`, `Plugin`, and `PluginSettingTab` from the Obsidian API, plus a local `greet` utility. Settings use `Record<string, never>` — an empty object type that prevents any keys. This is a clean placeholder: when you add settings fields, you change this type and `DEFAULT_SETTINGS` together.
 
----
+### `onload()` — Registration
 
-## 2. The Plugin Entry Point — `src/main.ts`
-
-This is where Obsidian loads the plugin. It follows the standard Obsidian plugin pattern: extend `Plugin`, implement `onload()`, register commands/ribbons/settings.
+The async `onload()` method is called by Obsidian when the plugin activates. It loads persisted settings, then registers three UI elements:
 
 ```bash
-cat -n src/main.ts
+tail -n +11 src/main.ts | head -26
 ```
 
 ```output
-     1	import { Notice, Plugin, PluginSettingTab } from "obsidian";
-     2	import { greet } from "./utils";
-     3	
-     4	type PluginSettings = Record<string, never>;
-     5	
-     6	const DEFAULT_SETTINGS: PluginSettings = {};
-     7	
-     8	export default class ExamplePlugin extends Plugin {
-     9	  settings: PluginSettings = DEFAULT_SETTINGS;
-    10	
-    11	  async onload(): Promise<void> {
-    12	    await this.loadSettings();
-    13	
-    14	    // This adds a simple command that can be triggered by the user (e.g., from the Command Palette).
-    15	    this.addCommand({
-    16	      id: "greet-command",
-    17	      name: "Greet the user",
-    18	      callback: () => {
-    19	        new Notice(greet("Obsidian User"));
-    20	      },
-    21	    });
-    22	
-    23	    // This adds a ribbon icon to the left ribbon.
-    24	    const ribbonIconEl = this.addRibbonIcon(
-    25	      "bell",
-    26	      "Greet via Ribbon Icon",
-    27	      (_evt: MouseEvent) => {
-    28	        // Called when the user clicks the icon.
-    29	        new Notice(greet("Ribbon Clicker"));
-    30	      },
-    31	    );
-    32	    // Perform some extra configuration on the ribbon icon element if necessary.
-    33	    ribbonIconEl.addClass("my-plugin-ribbon-class");
-    34	
-    35	    this.addSettingTab(new ExampleSettingTab(this.app, this));
-    36	  }
-    37	
-    38	  async loadSettings(): Promise<void> {
-    39	    this.settings = Object.assign({}, DEFAULT_SETTINGS, await this.loadData());
-    40	  }
-    41	
-    42	  async saveSettings(): Promise<void> {
-    43	    await this.saveData(this.settings);
-    44	  }
-    45	}
-    46	
-    47	class ExampleSettingTab extends PluginSettingTab {
-    48	  plugin: ExamplePlugin;
-    49	
-    50	  constructor(app: Plugin["app"], plugin: ExamplePlugin) {
-    51	    super(app, plugin);
-    52	    this.plugin = plugin;
-    53	  }
-    54	
-    55	  display(): void {
-    56	    this.containerEl.empty();
-    57	  }
-    58	}
+  async onload(): Promise<void> {
+    await this.loadSettings();
+
+    // This adds a simple command that can be triggered by the user (e.g., from the Command Palette).
+    this.addCommand({
+      id: "greet-command",
+      name: "Greet the user",
+      callback: () => {
+        new Notice(greet("Obsidian User"));
+      },
+    });
+
+    // This adds a ribbon icon to the left ribbon.
+    const ribbonIconEl = this.addRibbonIcon(
+      "bell",
+      "Greet via Ribbon Icon",
+      (_evt: MouseEvent) => {
+        // Called when the user clicks the icon.
+        new Notice(greet("Ribbon Clicker"));
+      },
+    );
+    // Perform some extra configuration on the ribbon icon element if necessary.
+    ribbonIconEl.addClass("my-plugin-ribbon-class");
+
+    this.addSettingTab(new ExampleSettingTab(this.app, this));
+  }
 ```
 
-### How it works
+Three registrations happen in `onload()`:
 
-**Line 4 — `PluginSettings`**: Typed as `Record<string, never>`, meaning "an object with no properties." This is a deliberate placeholder. When extending the template, you'd replace this with your actual settings shape.
+1. **Command** (`greet-command`) — Appears in the Command Palette, shows a `Notice` with "Hello, Obsidian User!".
+2. **Ribbon icon** — A bell icon in the left sidebar. Clicking it shows "Hello, Ribbon Clicker!". The element gets an extra CSS class for styling.
+3. **Settings tab** — Registers `ExampleSettingTab` (currently renders an empty container).
 
-**Lines 11–36 — `onload()`**: The Obsidian lifecycle hook. It does three things in order:
+### Settings Persistence
 
-1. **Loads persisted settings** (line 12) from Obsidian's data store via `this.loadData()`.
-2. **Registers a command** (lines 15–21) — appears in the Command Palette as "Greet the user."
-3. **Adds a ribbon icon** (lines 24–33) — a bell icon in the left sidebar that fires a `Notice`.
-4. **Registers a settings tab** (line 35) — wires up `ExampleSettingTab`.
-
-**Lines 38–44 — Settings persistence**: `loadSettings()` merges saved data over defaults using `Object.assign()`. This is the standard Obsidian pattern — it means new settings keys added in future versions get their defaults even if the user has old saved data.
-
-**Lines 47–58 — `ExampleSettingTab`**: Currently a stub — `display()` just clears the container. Template users would add `Setting` constructors here.
-
-### Concerns
-
-- **No `onunload()`**: The plugin doesn't implement `onunload()`. For this template it's harmless (Obsidian cleans up commands and ribbon icons automatically), but a real plugin with intervals, observers, or DOM listeners would need it.
-- **`export default`**: Obsidian requires the plugin class as the default export, so this is correct and necessary.
-
----
-
-## 3. Tests — `src/__tests__/main.test.ts`
-
-The test suite uses Bun's native test runner.
+`loadSettings()` merges saved data with defaults using `Object.assign`. `saveSettings()` writes the settings object to Obsidian's data store. Both delegate to the inherited `loadData()`/`saveData()` methods from `Plugin`.
 
 ```bash
-cat -n src/__tests__/main.test.ts
+tail -n +38 src/main.ts | head -7
 ```
 
 ```output
-cat: src/__tests__/main.test.ts: No such file or directory
+  async loadSettings(): Promise<void> {
+    this.settings = Object.assign({}, DEFAULT_SETTINGS, await this.loadData());
+  }
+
+  async saveSettings(): Promise<void> {
+    await this.saveData(this.settings);
+  }
 ```
 
-Two tests, both passing. They only cover `greet()` from `utils.ts` — the plugin class itself has no test coverage. This is a known gap (see issue #29).
+### Settings Tab — `ExampleSettingTab`
 
-### Concerns
-
-- **Tests not in CI**: The CI workflow (`main.yml`) runs `bun run check` but not `bun test`. Tests pass locally but aren't a quality gate. (Issue #25)
-- **No plugin-level tests**: Testing `ExamplePlugin` would require mocking the Obsidian API, which is non-trivial but valuable for a template to demonstrate.
-
----
-
-## 4. The Build System — `build.ts`
+The settings tab is a skeleton. It clears its container in `display()` but adds no controls. This is where you'd add `Setting` instances for user-configurable options.
 
 ```bash
-cat -n build.ts
+tail -n +47 src/main.ts
 ```
 
 ```output
-     1	const watch = process.argv.includes("--watch");
-     2	
-     3	const result = await Bun.build({
-     4	  entrypoints: ["src/main.ts"],
-     5	  outdir: ".",
-     6	  format: "cjs",
-     7	  external: ["obsidian", "electron"],
-     8	  minify: !watch,
-     9	});
-    10	
-    11	if (!result.success) {
-    12	  console.error("Build failed");
-    13	  for (const message of result.logs) console.error(message);
-    14	  process.exit(1);
-    15	}
-    16	
-    17	if (watch) console.log("Watching for changes...");
-    18	
-    19	export {};
-```
+class ExampleSettingTab extends PluginSettingTab {
+  plugin: ExamplePlugin;
 
-### How it works
+  constructor(app: Plugin["app"], plugin: ExamplePlugin) {
+    super(app, plugin);
+    this.plugin = plugin;
+  }
 
-**Line 1**: Checks for `--watch` flag. When `bun run dev` is invoked, `package.json` passes `--watch` to `build.ts`.
-
-**Lines 3–9 — `Bun.build()`**: The entire build configuration:
-
-- **`entrypoints`**: Single entry at `src/main.ts`. Bun resolves all imports from here.
-- **`outdir: "."`**: Output lands in the project root as `main.js`.
-- **`format: "cjs"`**: CommonJS — required by Obsidian's plugin loader (it uses `require()`).
-- **`external`**: `obsidian` and `electron` are provided by the host app at runtime. Bundling them would fail (and bloat the output).
-- **`minify: !watch`**: Minify in production builds, skip during development for readable output.
-
-**Line 19 — `export {}`**: Forces Bun to treat this file as an ESM module (needed for top-level `await` on line 3).
-
-### Concerns
-
-- **`--watch` doesn't actually watch**: Bun's `Bun.build()` API doesn't support file watching. The `--watch` flag only disables minification and prints a message. The `dev` script relies on Bun's built-in `--watch` for the *process* restart, but that's handled by `bun run`, not by `Bun.build()`. This works, but the "Watching for changes..." message on line 17 is slightly misleading — it's Bun's process watcher that restarts the whole script, not an incremental rebuild.
-
-Let's verify the build output:
-
-```bash
-bun run build.ts && wc -c main.js | awk "{print \$1, \"bytes\"}" && head -c 120 main.js && echo "..."
-```
-
-```output
-1185 bytes
-var{defineProperty:y,getOwnPropertyNames:k,getOwnPropertyDescriptor:m}=Object,q=Object.prototype.hasOwnProperty;var f=ne...
-```
-
-The minified output is ~1.2 KB. Obsidian plugins run inside Electron, so bundle size matters less than on the web, but keeping it small is good practice.
-
----
-
-## 5. Version Management — `version-bump.ts`
-
-Obsidian plugins have three files that carry version info: `package.json`, `manifest.json`, and `versions.json`. This script keeps them in sync.
-
-```bash
-cat -n version-bump.ts
-```
-
-```output
-     1	const targetVersion = process.env.npm_package_version;
-     2	if (!targetVersion) {
-     3	  throw new Error("No version found in package.json");
-     4	}
-     5	
-     6	// Update manifest.json
-     7	const manifest = await Bun.file("manifest.json").json();
-     8	const { minAppVersion } = manifest;
-     9	manifest.version = targetVersion;
-    10	await Bun.write("manifest.json", `${JSON.stringify(manifest, null, 2)}\n`);
-    11	
-    12	// Update versions.json
-    13	const versions = await Bun.file("versions.json").json();
-    14	versions[targetVersion] = minAppVersion;
-    15	await Bun.write("versions.json", `${JSON.stringify(versions, null, 2)}\n`);
-    16	
-    17	console.log(`Updated to version ${targetVersion}`);
-    18	
-    19	export {};
-```
-
-### How it works
-
-**Line 8**: Reads `npm_package_version` from the environment. This is set automatically when you run scripts via `bun run` (or `npm run`). That's why CLAUDE.md says "Must be run as `bun run version`, not directly."
-
-**Lines 14–17**: Reads `manifest.json`, updates its `version` field, writes it back with 2-space indent and trailing newline.
-
-**Lines 20–22**: Reads `versions.json` and adds a new entry mapping the new version to the current `minAppVersion`. This file tells Obsidian which minimum app version each plugin version requires.
-
-### The version flow
-
-1. Edit `version` in `package.json` (the source of truth)
-2. Run `bun run version` — syncs to `manifest.json` and `versions.json`
-3. Commit, tag, push → release workflow builds and publishes
-
-Let's look at the current state of all three files:
-
-```bash
-echo "=== package.json ===" && grep "\"version\"" package.json && echo && echo "=== manifest.json ===" && grep "\"version\"" manifest.json && echo && echo "=== versions.json ===" && cat versions.json
-```
-
-```output
-=== package.json ===
-  "version": "1.0.1",
-    "version": "bun run version-bump.ts",
-
-=== manifest.json ===
-  "version": "1.0.1",
-
-=== versions.json ===
-{
-  "1.0.0": "1.0.0",
-  "1.0.1": "1.0.0"
+  display(): void {
+    this.containerEl.empty();
+  }
 }
 ```
 
-All three files agree on `1.0.1`. The `versions.json` entry `"1.0.1": "1.0.0"` means plugin version 1.0.1 requires Obsidian app version 1.0.0 or later.
+## Utility Module — `src/utils.ts`
 
----
-
-## 6. Pre-Release Validation — `scripts/validate-plugin.ts`
+A single pure function that formats a greeting string. Extracted from `main.ts` to demonstrate module separation and testability.
 
 ```bash
-cat -n scripts/validate-plugin.ts
+head -8 src/utils.ts
 ```
 
 ```output
-cat: scripts/validate-plugin.ts: No such file or directory
+/**
+ * A simple utility function to demonstrate testing and basic plugin functionality.
+ * @param name The name to greet.
+ * @returns A greeting string.
+ */
+export function greet(name: string): string {
+  return `Hello, ${name}!`;
+}
 ```
 
-### How it works
+## Tests — `src/main.test.ts`
 
-The script runs four checks in sequence, accumulating an error count:
-
-1. **Manifest fields** (line 12): Verifies `manifest.json` has `id`, `name`, and `version`.
-2. **Version match** (line 22): Confirms `package.json` and `manifest.json` agree on the version.
-3. **Code quality** (line 37): Runs `bun run check` (typecheck + biome lint).
-4. **Build** (line 47): Runs `bun run build.ts` and verifies `main.js` was produced.
-
-Uses Bun's `$` shell template tag with `.nothrow()` so subprocess failures don't throw — they're handled via `exitCode` checks instead.
-
-### Concerns
-
-- **No test step**: The validate script runs checks and build but skips `bun test`. A pre-release gate should include tests. (Issue #26)
-- **Line 47 — `bun run build.ts`**: This calls `build.ts` directly instead of `bun run build` (which runs `check` first). Since `check` already ran on line 37, this avoids double-checking — but if someone changes the `build` script later, this could diverge.
-- **`if: always()`** is not used — if the check step fails, the build still runs. This is arguably correct (you might want to see all failures at once), but it means a type error won't stop the build attempt.
-
----
-
-## 7. Configuration Files
-
-### TypeScript — `tsconfig.json`
+Tests use Bun's native test runner. Two tests cover the `greet` function: a happy path and an empty-string edge case. The plugin class itself has no tests (tracked in issue #29).
 
 ```bash
-cat -n tsconfig.json
+head -11 src/main.test.ts
 ```
 
 ```output
-     1	{
-     2	  "compilerOptions": {
-     3	    "target": "ESNext",
-     4	    "lib": ["DOM", "ESNext"],
-     5	    "module": "ESNext",
-     6	    "moduleResolution": "bundler",
-     7	    "types": ["bun", "node"],
-     8	    "noEmit": true,
-     9	    "strict": true,
-    10	    "skipLibCheck": true
-    11	  },
-    12	  "include": ["src/**/*.ts", "build.ts", "version-bump.ts"],
-    13	  "exclude": ["src/**/*.test.ts"]
-    14	}
+import { expect, test } from "bun:test";
+import { greet } from "./utils";
+
+test("greet function returns a greeting", () => {
+  expect(greet("World")).toBe("Hello, World!");
+  expect(greet("Obsidian")).toBe("Hello, Obsidian!");
+});
+
+test("greet function handles empty string", () => {
+  expect(greet("")).toBe("Hello, !");
+});
 ```
 
-Key choices:
+## Build System — `build.ts`
 
-- **`noEmit: true`**: TypeScript is used only for type checking. Bun handles compilation.
-- **`strict: true`**: Full strict mode — `strictNullChecks`, `noImplicitAny`, etc.
-- **`moduleResolution: "bundler"`**: The modern resolution strategy that matches how Bun resolves imports.
-- **`skipLibCheck: true`**: Skips type checking `.d.ts` files from dependencies. Speeds up checks and avoids issues with conflicting type definitions.
-- **`include`**: Covers source, build script, and version-bump script. Notably excludes `scripts/validate-plugin.ts` — it still type-checks because Bun runs it directly, but `tsc --noEmit` won't catch errors there.
-
-### Biome — `biome.json`
+The build script uses Bun's native bundler. It reads `--watch` from argv to toggle minification (minified in production, unminified in watch mode). Output is CommonJS format to `./main.js`, with `obsidian` and `electron` marked as externals since Obsidian provides them at runtime.
 
 ```bash
-cat -n biome.json
+head -19 build.ts
 ```
 
 ```output
-     1	{
-     2	  "$schema": "https://biomejs.dev/schemas/latest/schema.json",
-     3	  "vcs": {
-     4	    "enabled": true,
-     5	    "clientKind": "git",
-     6	    "useIgnoreFile": true
-     7	  },
-     8	  "files": {
-     9	    "includes": [
-    10	      "src/**/*.ts",
-    11	      "src/**/*.js",
-    12	      "*.json",
-    13	      "scripts/**/*.ts",
-    14	      "version-bump.ts",
-    15	      "build.ts"
-    16	    ],
-    17	    "ignoreUnknown": true
-    18	  },
-    19	  "formatter": {
-    20	    "indentStyle": "space"
-    21	  },
-    22	  "assist": {
-    23	    "actions": {
-    24	      "source": {
-    25	        "organizeImports": "on"
-    26	      }
-    27	    }
-    28	  }
-    29	}
+const watch = process.argv.includes("--watch");
+
+const result = await Bun.build({
+  entrypoints: ["src/main.ts"],
+  outdir: ".",
+  format: "cjs",
+  external: ["obsidian", "electron"],
+  minify: !watch,
+});
+
+if (!result.success) {
+  console.error("Build failed");
+  for (const message of result.logs) console.error(message);
+  process.exit(1);
+}
+
+if (watch) console.log("Watching for changes...");
+
+export {};
 ```
 
-- **VCS integration**: Biome respects `.gitignore`, so `node_modules/` and other ignored paths are skipped automatically.
-- **`includes`**: Explicit file list rather than glob-everything. This prevents Biome from touching `main.js` (the build output) or markdown files.
-- **`indentStyle: "space"`**: 2-space indent (Biome's default width).
-- **`organizeImports`**: Auto-sorts imports on format.
-- No custom lint rules — uses Biome's recommended defaults, which is appropriate for a template.
+The `export {}` at the end makes the file a module (required for top-level `await`). Note that `--watch` here only controls minification — it doesn't enable Bun's file watcher. The `bun run dev` script in `package.json` passes `--watch` to this script but Bun's bundler doesn't have a built-in watch mode, so rebuilds require re-running the command.
 
-### Package scripts — `package.json`
+## Version Bumping — `version-bump.ts`
+
+When you run `bun run version` (which triggers `npm version` lifecycle), this script reads the new version from `npm_package_version` and syncs it to `manifest.json` and `versions.json`.
 
 ```bash
-sed -n "7,20p" package.json | cat -n
+head -19 version-bump.ts
 ```
 
 ```output
-     1	  "license": "MIT",
-     2	  "scripts": {
-     3	    "audit": "bun audit --audit-level=critical",
-     4	    "dev": "bun run build.ts --watch",
-     5	    "build": "bun run check && bun run build.ts",
-     6	    "check": "bun run typecheck && biome check .",
-     7	    "typecheck": "tsc --noEmit",
-     8	    "lint": "biome check .",
-     9	    "lint:fix": "biome check --write .",
-    10	    "format": "biome format --write .",
-    11	    "format:check": "biome format .",
-    12	    "version": "bun run version-bump.ts",
-    13	    "test": "bun test",
-    14	    "deploy": "echo 'Update this path: cp main.js manifest.json ~/path/to/vault/.obsidian/plugins/your-plugin/'"
+const targetVersion = process.env.npm_package_version;
+if (!targetVersion) {
+  throw new Error("No version found in package.json");
+}
+
+// Update manifest.json
+const manifest = await Bun.file("manifest.json").json();
+const { minAppVersion } = manifest;
+manifest.version = targetVersion;
+await Bun.write("manifest.json", `${JSON.stringify(manifest, null, 2)}\n`);
+
+// Update versions.json
+const versions = await Bun.file("versions.json").json();
+versions[targetVersion] = minAppVersion;
+await Bun.write("versions.json", `${JSON.stringify(versions, null, 2)}\n`);
+
+console.log(`Updated to version ${targetVersion}`);
+
+export {};
 ```
 
-The script dependency chain:
+The script uses Bun's `Bun.file().json()` and `Bun.write()` APIs for file I/O — no Node.js `fs` module needed. It reads `minAppVersion` from the current `manifest.json` and maps the new version to it in `versions.json`, building up the compatibility matrix over time.
+
+## Configuration Files
+
+### `manifest.json` — Plugin Identity
+
+Obsidian reads this file to identify the plugin. Key fields: `id` (unique plugin identifier), `version`, `minAppVersion` (minimum Obsidian version required), and `isDesktopOnly`.
 
 ```bash
-cat <<'HEREDOC'
-build → check → typecheck (tsc --noEmit)
-              → biome check .
-       → build.ts (Bun.build)
-
-validate → manifest checks
-         → version match check
-         → check (same as above)
-         → build.ts
-
-dev → build.ts --watch (no check, for speed)
-HEREDOC
+head -10 manifest.json
 ```
 
 ```output
-build → check → typecheck (tsc --noEmit)
-              → biome check .
-       → build.ts (Bun.build)
-
-validate → manifest checks
-         → version match check
-         → check (same as above)
-         → build.ts
-
-dev → build.ts --watch (no check, for speed)
+{
+  "id": "your-plugin-id",
+  "name": "Your Plugin Name",
+  "version": "1.0.1",
+  "minAppVersion": "1.0.0",
+  "description": "A brief description of your plugin",
+  "author": "Mark Ayers",
+  "authorUrl": "https://github.com/philoserf",
+  "isDesktopOnly": false
+}
 ```
 
-Notable: `build` gates on `check`, so you can't produce a build artifact without passing types and lint. But `test` is not in the chain anywhere — it's an independent, manual step.
+### `tsconfig.json` — TypeScript Compilation
 
----
-
-## 8. CI/CD Workflows
-
-### CI — `.github/workflows/main.yml`
+Targets ESNext with bundler module resolution (appropriate for Bun). Strict mode is enabled. Test files are excluded from type checking. The `noEmit` flag means `tsc` is used only for type checking — Bun handles the actual compilation.
 
 ```bash
-cat -n .github/workflows/main.yml
+head -14 tsconfig.json
 ```
 
 ```output
-     1	name: CI
-     2	
-     3	on:
-     4	  push:
-     5	    branches: [main]
-     6	  pull_request:
-     7	    branches: [main]
-     8	
-     9	jobs:
-    10	  check:
-    11	    runs-on: ubuntu-latest
-    12	    steps:
-    13	      - uses: actions/checkout@v6
-    14	      - uses: oven-sh/setup-bun@v2
-    15	        with:
-    16	          bun-version: latest
-    17	      - run: bun install
-    18	      - run: bun audit --audit-level=critical
-    19	      - run: bun run check
-    20	      - run: bun test
+{
+  "compilerOptions": {
+    "target": "ESNext",
+    "lib": ["DOM", "ESNext"],
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "types": ["bun", "node"],
+    "noEmit": true,
+    "strict": true,
+    "skipLibCheck": true
+  },
+  "include": ["src/**/*.ts", "build.ts", "version-bump.ts"],
+  "exclude": ["src/**/*.test.ts"]
+}
 ```
 
-Minimal and correct. Runs on push to `main` and on PRs targeting `main`. Uses `oven-sh/setup-bun@v2` with `latest` version, then runs `check` (typecheck + biome).
+### `biome.json` — Linting and Formatting
 
-**Concern**: No `bun test` step. Tests exist but aren't part of CI. (Issue #25)
-
-### Release — `.github/workflows/release.yml`
+Biome is configured with git-aware VCS integration (respects `.gitignore`), space indentation, and auto-organized imports. It explicitly includes source files and config files but uses `ignoreUnknown` to skip unrecognized file types.
 
 ```bash
-cat -n .github/workflows/release.yml
+head -29 biome.json
 ```
 
 ```output
-     1	name: Release
-     2	
-     3	on:
-     4	  push:
-     5	    tags:
-     6	      - "*"
-     7	
-     8	permissions:
-     9	  contents: write
-    10	
-    11	jobs:
-    12	  build:
-    13	    runs-on: ubuntu-latest
-    14	    steps:
-    15	      - uses: actions/checkout@v6
-    16	
-    17	      - uses: oven-sh/setup-bun@v2
-    18	        with:
-    19	          bun-version: latest
-    20	
-    21	      - run: |
-    22	          bun install
-    23	          bun run build
-    24	
-    25	      - name: Create release
-    26	        uses: softprops/action-gh-release@v2
-    27	        with:
-    28	          files: |
-    29	            main.js
-    30	            manifest.json
-    31	          fail_on_unmatched_files: true
-    32	        env:
-    33	          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+{
+  "$schema": "https://biomejs.dev/schemas/latest/schema.json",
+  "vcs": {
+    "enabled": true,
+    "clientKind": "git",
+    "useIgnoreFile": true
+  },
+  "files": {
+    "includes": [
+      "src/**/*.ts",
+      "src/**/*.js",
+      "*.json",
+      "scripts/**/*.ts",
+      "version-bump.ts",
+      "build.ts"
+    ],
+    "ignoreUnknown": true
+  },
+  "formatter": {
+    "indentStyle": "space"
+  },
+  "assist": {
+    "actions": {
+      "source": {
+        "organizeImports": "on"
+      }
+    }
+  }
+}
 ```
 
-Triggered by any tag push (`tags: ["*"]`). Builds the plugin with `bun run build` (which runs `check` first), then creates a GitHub Release with `main.js` and `manifest.json` as assets using `softprops/action-gh-release@v2`.
+## CI/CD Pipeline
 
-**`fail_on_unmatched_files: true`** is a good safety — if the build somehow doesn't produce `main.js`, the release fails instead of publishing incomplete artifacts.
+### CI Workflow — `.github/workflows/main.yml`
 
-**Concern**: The tag pattern `"*"` matches any tag, not just semver. A tag like `test-foo` would trigger a release. A stricter pattern like `"[0-9]*"` or `"v*"` would be safer.
-
-### Dependabot Auto-Merge — `.github/workflows/dependabot.yml`
+Runs on every push to `main` and on pull requests. Steps: install dependencies, audit for critical vulnerabilities, run all checks (typecheck + biome), and run tests.
 
 ```bash
-cat -n .github/workflows/dependabot.yml
+head -21 .github/workflows/main.yml
 ```
 
 ```output
-cat: .github/workflows/dependabot.yml: No such file or directory
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+      - run: bun install
+      - run: bun audit --audit-level=critical
+      - run: bun run check
+      - run: bun test
 ```
 
-### Concerns
+### Release Workflow — `.github/workflows/release.yml`
 
-1. **`if: always()` on approve/merge (lines 35, 41)**: The approve and merge steps run even if `bun run check` fails. This means a Dependabot PR that breaks type checking or lint will still be approved and auto-merged. This should be `if: success()` (the default) or removed entirely.
-
-2. **No `bun test` step**: Same gap as CI — checks pass but tests aren't run. (Issue #27)
-
-3. **`actions/setup-node@v4` instead of `oven-sh/setup-bun`**: This workflow sets up Node.js 20 but then runs `bun install` and `bun run check`. It works because Bun is pre-installed on GitHub's `ubuntu-latest` runners, but it's inconsistent with the other workflows that explicitly use `oven-sh/setup-bun@v2`. The Node.js setup step is unnecessary.
-
-4. **`pull_request_target` trigger (line 6)**: This event runs in the context of the base branch with write permissions. For Dependabot this is fine (it's a trusted actor), but `pull_request_target` is a common source of security issues if the actor check on line 15 were ever removed or weakened.
-
-5. **`fetch-depth: 0`**: Full history checkout is unnecessary for running checks. The other workflows don't use it.
-
-### Dependabot Configuration — `.github/dependabot.yml`
+Triggered by any tag push. Builds the plugin and creates a GitHub release with `main.js` and `manifest.json` attached — the two files Obsidian needs to install a plugin.
 
 ```bash
-cat -n .github/dependabot.yml
+head -34 .github/workflows/release.yml
 ```
 
 ```output
-     1	version: 2
-     2	updates:
-     3	  - package-ecosystem: npm
-     4	    directory: "/"
-     5	    schedule:
-     6	      interval: weekly
-     7	      day: monday
-     8	      time: "03:00"
-     9	    open-pull-requests-limit: 10
-    10	    reviewers:
-    11	      - philoserf
-    12	    assignees:
-    13	      - philoserf
-    14	    commit-message:
-    15	      prefix: "chore"
-    16	      prefix-scope: "deps"
-    17	      include: "scope"
-    18	
-    19	  - package-ecosystem: github-actions
-    20	    directory: "/"
-    21	    schedule:
-    22	      interval: weekly
-    23	      day: monday
-    24	      time: "03:00"
-    25	    open-pull-requests-limit: 10
-    26	    reviewers:
-    27	      - philoserf
-    28	    assignees:
-    29	      - philoserf
-    30	    commit-message:
-    31	      prefix: "chore"
-    32	      prefix-scope: "ci"
-    33	      include: "scope"
+name: Release
+
+on:
+  push:
+    tags:
+      - "*"
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - run: |
+          bun install
+          bun run build
+
+      - name: Create release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            main.js
+            manifest.json
+          fail_on_unmatched_files: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 ```
 
-Good setup: weekly updates for both npm packages and GitHub Actions, Monday at 03:00 UTC. Commit messages follow conventional commits (`chore(deps):` for packages, `chore(ci):` for actions). Reviewer and assignee set to the repo owner.
+### Dependabot — `.github/dependabot.yml`
 
----
+Weekly dependency updates for both npm packages and GitHub Actions, scheduled Mondays at 03:00 UTC. Uses conventional commit format (`chore(deps):` for npm, `chore(ci):` for actions).
 
-## 9. What `.gitignore` Covers
+## Concerns
 
-```bash
-cat -n .gitignore
-```
+### Code Quality
 
-```output
-     1	# Build output
-     2	*.js.map
-     3	
-     4	# Dependencies
-     5	node_modules/
-     6	
-     7	# Bun
-     8	.bun/
-     9	bun.lockb
-    10	
-    11	# Environment
-    12	.env
-    13	.env.local
-    14	
-    15	# OS
-    16	.DS_Store
-    17	Thumbs.db
-    18	
-    19	# IDE
-    20	.vscode/
-    21	.idea/
-    22	*.swp
-    23	*.swo
-    24	*~
-    25	
-    26	# Claude Code
-    27	.claude/settings.local.json
-    28	
-    29	# Planning
-    30	.planning/
-```
+1. **No `onunload()` method.** The plugin class doesn't implement `onunload()`. While Obsidian handles basic cleanup (removing commands, ribbon icons, settings tabs registered via `this.addCommand` etc.), the official sample plugin includes it as a lifecycle hook for custom teardown. For a template, it's worth including — even as an empty method — so users know the hook exists.
 
-Covers the essentials: source maps, dependencies, env files, OS junk, IDE configs, Claude Code local settings.
+2. **Placeholder manifest values.** `manifest.json` still has `"id": "your-plugin-id"` and `"name": "Your Plugin Name"`. These should be updated or documented more prominently as requiring customization.
 
-**Notable absence**: `main.js` is not gitignored. The compiled build output is tracked in git. Since the release workflow builds from source, tracking the artifact adds diff noise without providing value. (Issue #28)
+3. **`saveSettings()` is never called.** The method exists but nothing invokes it. Since the settings tab has no controls, this is consistent — but a template user might not realize they need to wire it up when adding settings.
 
-Also: `bun.lockb` is ignored (Bun's old binary lockfile format) but `bun.lock` (the current text-based format) is tracked — this is correct for modern Bun.
+4. **No plugin class tests.** Only `utils.ts` is tested. The plugin class has no test coverage (tracked in issue #29). Testing Obsidian plugins requires mocking the Obsidian API, which is non-trivial but expected in a template.
 
----
+### Community Standards
 
-## 10. Summary of Concerns
+5. **Release tag pattern is too broad.** The release workflow triggers on `tags: ["*"]`, meaning any tag (not just semver) triggers a release build. The Obsidian community standard is to match semver tags like `"[0-9]*"` or `"v*"`.
 
-### Quality gate gaps
+6. **`main.js` is committed.** This is intentional and required — Obsidian expects `main.js` in the repo for direct GitHub installation. The `.gitignore` correctly does not ignore it. This is a gotcha that trips up many plugin developers.
 
-| What | CI | Validate | Dependabot |
-|------|----|----------|------------|
-| Type check | yes | yes | yes |
-| Biome lint | yes | yes | yes |
-| Tests | **no** | **no** | **no** |
-| Build | no | yes | no |
+7. **Watch mode doesn't actually watch.** The `bun run dev` script passes `--watch` to `build.ts`, which only toggles minification. There's no file watcher — users expecting hot-reload will be confused. Consider documenting this or implementing actual watch behavior.
 
-Tests are the missing leg of the stool. All three pipelines skip `bun test`.
+8. **`scripts/**/*.ts` in biome includes.** The `biome.json` includes `scripts/**/*.ts` but no `scripts/` directory exists. Harmless but untidy.
 
-### Dependabot workflow issues
-
-- `if: always()` on approve/merge means broken PRs get auto-merged
-- Uses `actions/setup-node` instead of `oven-sh/setup-bun` (inconsistent)
-- `fetch-depth: 0` is unnecessary
-
-### Release workflow
-
-- Tag pattern `"*"` is overly broad — any tag triggers a release
-
-### Build artifact
-
-- `main.js` tracked in git — adds noise, release workflow builds from source anyway
-
-### Template completeness
-
-- `ExampleSettingTab.display()` is empty — no example of adding a `Setting`
-- No `onunload()` shown — useful for plugins with cleanup needs
-- No plugin-level test coverage
-
-### Community standards
-
-The template aligns well with the [Obsidian sample plugin](https://github.com/obsidianmd/obsidian-sample-plugin):
-
-- Same `manifest.json` / `versions.json` structure
-- Same `version-bump.ts` approach (reads `npm_package_version`)
-- Same build externals (`obsidian`, `electron`)
-- Adds Biome (sample uses ESLint) and Bun (sample uses esbuild + Node) — reasonable modernizations
-
-The main divergence from community norms is using Bun instead of the Node/esbuild stack. This is a deliberate choice documented in the README and AGENTS.md.
-
----
-
-Open issues for tracked concerns: #25, #26, #27, #28, #29, #30.
