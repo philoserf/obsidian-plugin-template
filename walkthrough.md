@@ -312,19 +312,20 @@ echo "=== package.json ===" && grep "\"version\"" package.json && echo && echo "
 
 ```output
 === package.json ===
-  "version": "1.0.0",
+  "version": "1.0.1",
     "version": "bun run version-bump.ts",
 
 === manifest.json ===
-  "version": "1.0.0",
+  "version": "1.0.1",
 
 === versions.json ===
 {
-  "1.0.0": "1.0.0"
+  "1.0.0": "1.0.0",
+  "1.0.1": "1.0.0"
 }
 ```
 
-All three files agree on `1.0.0`. The `versions.json` entry `"1.0.0": "1.0.0"` means plugin version 1.0.0 requires Obsidian app version 1.0.0 or later.
+All three files agree on `1.0.1`. The `versions.json` entry `"1.0.1": "1.0.0"` means plugin version 1.0.1 requires Obsidian app version 1.0.0 or later.
 
 ---
 
