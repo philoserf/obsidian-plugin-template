@@ -24,6 +24,8 @@ find . -not -path "./node_modules/*" -not -path "./.git/*" -not -path "./.bun/*"
 ./.github/dependabot.yml
 ./.github/settings.yml
 ./.github/workflows
+./.github/workflows/claude-code-review.yml
+./.github/workflows/claude.yml
 ./.github/workflows/main.yml
 ./.github/workflows/release.yml
 ./.gitignore
@@ -37,8 +39,6 @@ find . -not -path "./node_modules/*" -not -path "./.git/*" -not -path "./.bun/*"
 ./node_modules
 ./package.json
 ./README.md
-./scripts
-./scripts/validate-plugin.ts
 ./src
 ./src/main.test.ts
 ./src/main.ts
@@ -269,25 +269,25 @@ cat -n version-bump.ts
 ```
 
 ```output
-     1	import { readFileSync, writeFileSync } from "node:fs";
-     2	
-     3	const targetVersion = process.env.npm_package_version;
-     4	if (!targetVersion) {
-     5	  throw new Error("No version found in package.json");
-     6	}
-     7	
-     8	// Update manifest.json
-     9	const manifest = JSON.parse(readFileSync("manifest.json", "utf8"));
-    10	const { minAppVersion } = manifest;
-    11	manifest.version = targetVersion;
-    12	writeFileSync("manifest.json", `${JSON.stringify(manifest, null, 2)}\n`);
-    13	
-    14	// Update versions.json
-    15	const versions = JSON.parse(readFileSync("versions.json", "utf8"));
-    16	versions[targetVersion] = minAppVersion;
-    17	writeFileSync("versions.json", `${JSON.stringify(versions, null, 2)}\n`);
+     1	const targetVersion = process.env.npm_package_version;
+     2	if (!targetVersion) {
+     3	  throw new Error("No version found in package.json");
+     4	}
+     5	
+     6	// Update manifest.json
+     7	const manifest = await Bun.file("manifest.json").json();
+     8	const { minAppVersion } = manifest;
+     9	manifest.version = targetVersion;
+    10	await Bun.write("manifest.json", `${JSON.stringify(manifest, null, 2)}\n`);
+    11	
+    12	// Update versions.json
+    13	const versions = await Bun.file("versions.json").json();
+    14	versions[targetVersion] = minAppVersion;
+    15	await Bun.write("versions.json", `${JSON.stringify(versions, null, 2)}\n`);
+    16	
+    17	console.log(`Updated to version ${targetVersion}`);
     18	
-    19	console.log(`Updated to version ${targetVersion}`);
+    19	export {};
 ```
 
 ### How it works
@@ -335,78 +335,7 @@ cat -n scripts/validate-plugin.ts
 ```
 
 ```output
-     1	#!/usr/bin/env bun
-     2	
-     3	import { readFileSync } from "node:fs";
-     4	import { $ } from "bun";
-     5	
-     6	const manifest = JSON.parse(readFileSync("manifest.json", "utf-8"));
-     7	console.log(`🔍 Validating ${manifest.name || "plugin"}...\n`);
-     8	
-     9	let errors = 0;
-    10	
-    11	// Check manifest.json
-    12	if (!manifest.id || !manifest.name || !manifest.version) {
-    13	  console.error("✗ manifest.json missing required fields");
-    14	  errors++;
-    15	} else {
-    16	  console.log(`✓ manifest.json — ${manifest.name} v${manifest.version}`);
-    17	}
-    18	
-    19	// Check package.json version matches manifest
-    20	try {
-    21	  const pkg = JSON.parse(readFileSync("package.json", "utf-8"));
-    22	  if (pkg.version !== manifest.version) {
-    23	    console.error(
-    24	      `✗ Version mismatch: package.json (${pkg.version}) != manifest.json (${manifest.version})`,
-    25	    );
-    26	    errors++;
-    27	  } else {
-    28	    console.log("✓ Version numbers match");
-    29	  }
-    30	} catch (error) {
-    31	  console.error("✗ Version check failed:", error);
-    32	  errors++;
-    33	}
-    34	
-    35	// Run checks
-    36	console.log("\n🔧 Checking code quality...");
-    37	const checkResult = await $`bun run check`.nothrow();
-    38	if (checkResult.exitCode === 0) {
-    39	  console.log("✓ Code quality checks passed");
-    40	} else {
-    41	  console.error("✗ Code quality checks failed");
-    42	  errors++;
-    43	}
-    44	
-    45	// Build the plugin
-    46	console.log("\n📦 Building plugin...");
-    47	const buildResult = await $`bun run build.ts`.nothrow();
-    48	if (buildResult.exitCode === 0) {
-    49	  console.log("✓ Build successful");
-    50	
-    51	  const mainFile = Bun.file("main.js");
-    52	  if (await mainFile.exists()) {
-    53	    const size = mainFile.size / 1024;
-    54	    console.log(`  Output: main.js (${size.toFixed(2)} KB)`);
-    55	  } else {
-    56	    console.error("✗ main.js not found after build");
-    57	    errors++;
-    58	  }
-    59	} else {
-    60	  console.error("✗ Build failed");
-    61	  errors++;
-    62	}
-    63	
-    64	// Summary
-    65	console.log(`\n${"=".repeat(50)}`);
-    66	if (errors === 0) {
-    67	  console.log("✅ All validations passed! Plugin is ready.");
-    68	  process.exit(0);
-    69	} else {
-    70	  console.log(`❌ Validation failed with ${errors} error(s).`);
-    71	  process.exit(1);
-    72	}
+cat: scripts/validate-plugin.ts: No such file or directory
 ```
 
 ### How it works
@@ -443,13 +372,14 @@ cat -n tsconfig.json
      4	    "lib": ["DOM", "ESNext"],
      5	    "module": "ESNext",
      6	    "moduleResolution": "bundler",
-     7	    "noEmit": true,
-     8	    "strict": true,
-     9	    "skipLibCheck": true
-    10	  },
-    11	  "include": ["src/**/*.ts", "build.ts", "version-bump.ts"],
-    12	  "exclude": ["src/**/*.test.ts"]
-    13	}
+     7	    "types": ["bun", "node"],
+     8	    "noEmit": true,
+     9	    "strict": true,
+    10	    "skipLibCheck": true
+    11	  },
+    12	  "include": ["src/**/*.ts", "build.ts", "version-bump.ts"],
+    13	  "exclude": ["src/**/*.test.ts"]
+    14	}
 ```
 
 Key choices:
@@ -522,9 +452,9 @@ sed -n "7,20p" package.json | cat -n
      9	    "lint:fix": "biome check --write .",
     10	    "format": "biome format --write .",
     11	    "format:check": "biome format .",
-    12	    "validate": "bun run scripts/validate-plugin.ts",
-    13	    "version": "bun run version-bump.ts",
-    14	    "test": "bun test",
+    12	    "version": "bun run version-bump.ts",
+    13	    "test": "bun test",
+    14	    "deploy": "echo 'Update this path: cp main.js manifest.json ~/path/to/vault/.obsidian/plugins/your-plugin/'"
 ```
 
 The script dependency chain:
@@ -583,15 +513,13 @@ cat -n .github/workflows/main.yml
     11	    runs-on: ubuntu-latest
     12	    steps:
     13	      - uses: actions/checkout@v6
-    14	
-    15	      - uses: oven-sh/setup-bun@v2
-    16	        with:
-    17	          bun-version: latest
-    18	
-    19	      - run: bun install
-    20	      - run: bun audit --audit-level=critical
-    21	      - run: bun run check
-    22	      - run: bun test
+    14	      - uses: oven-sh/setup-bun@v2
+    15	        with:
+    16	          bun-version: latest
+    17	      - run: bun install
+    18	      - run: bun audit --audit-level=critical
+    19	      - run: bun run check
+    20	      - run: bun test
 ```
 
 Minimal and correct. Runs on push to `main` and on PRs targeting `main`. Uses `oven-sh/setup-bun@v2` with `latest` version, then runs `check` (typecheck + biome).

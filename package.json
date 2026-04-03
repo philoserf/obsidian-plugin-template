@@ -1,6 +1,6 @@
 {
   "name": "obsidian-plugin-template",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "A minimal template for Obsidian plugins using Bun",
   "main": "main.js",
   "author": "Mark Ayers",

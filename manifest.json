@@ -1,7 +1,7 @@
 {
   "id": "your-plugin-id",
   "name": "Your Plugin Name",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "minAppVersion": "1.0.0",
   "description": "A brief description of your plugin",
   "author": "Mark Ayers",
