@@ -1,11 +1,9 @@
-import { expect, test } from "bun:test";
-import { greet } from "./utils";
+import { describe, expect, test } from "bun:test";
+import ExamplePlugin from "./main";
 
-test("greet function returns a greeting", () => {
-  expect(greet("World")).toBe("Hello, World!");
-  expect(greet("Obsidian")).toBe("Hello, Obsidian!");
-});
-
-test("greet function handles empty string", () => {
-  expect(greet("")).toBe("Hello, !");
+describe("ExamplePlugin", () => {
+  test("initializes with empty default settings", () => {
+    const plugin = new (ExamplePlugin as new () => ExamplePlugin)();
+    expect(plugin.settings).toEqual({});
+  });
 });
