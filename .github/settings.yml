@@ -1,7 +1,0 @@
-_extends: .github
-
-repository:
-  name: obsidian-plugin-template
-  description: "Minimal template for Obsidian plugins using Bun"
-  homepage: https://philoserf.github.io/obsidian-plugin-template/
-  is_template: true
