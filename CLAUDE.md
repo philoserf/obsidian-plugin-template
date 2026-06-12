@@ -4,6 +4,8 @@
 
 Minimal template for Obsidian plugins using Bun as the build tool and runtime.
 
+The current next step for this repo is tracked in the workspace backlog at `../NEXT.md` (the `obsidian-plugin-template` row). Read it when starting work; update it when that step ships.
+
 ## Development Commands
 
 ```bash
@@ -27,6 +29,10 @@ bun test                 # Run tests
 - **Entry point**: `src/main.ts`
 - **Output**: `./main.js` (CommonJS format, minified in production)
 - **Externals**: `obsidian` and `electron` are not bundled
+
+### Testing
+
+Plugin lifecycle is exercised by Obsidian itself — never instantiate the `Plugin` class in tests. Test pure modules imported by `main.ts` (see `src/utils.ts` / `src/utils.test.ts` for the pattern).
 
 ### Release Process
 
