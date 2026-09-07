@@ -36,12 +36,7 @@ Plugin lifecycle is exercised by Obsidian itself — never instantiate the `Plug
 
 ### Release Process
 
-Tag and push to trigger the GitHub Actions release workflow:
-
-```bash
-git tag -a 1.0.0 -m "Release 1.0.0"
-git push origin 1.0.0
-```
+Use the `obsidian-release-gate` then `obsidian-release-ship` skills — do not tag by hand.
 
 ## Code Style
 
