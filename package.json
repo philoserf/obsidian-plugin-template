@@ -20,8 +20,8 @@
     "deploy": "echo 'Update this path: cp main.js manifest.json ~/path/to/vault/.obsidian/plugins/your-plugin/'"
   },
   "devDependencies": {
-    "@biomejs/biome": "^2.5.11",
-    "@types/bun": "^1.4.0",
+    "@biomejs/biome": "^2.5.14",
+    "@types/bun": "^1.4.2",
     "obsidian": "^1.13.1",
     "typescript": "^7.0.2"
   }
