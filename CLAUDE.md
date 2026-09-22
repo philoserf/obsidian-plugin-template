@@ -19,7 +19,7 @@ The current next step for this repo is tracked in the workspace backlog at `../N
 ```bash
 bun install                      # Install dependencies
 bun run build                    # Runs check, then bundles to ./main.js (minified)
-bun run dev                      # Unminified build; despite the flag name it does NOT watch
+bun run dev                      # Unminified build, rebuilt on every change (watch mode)
 bun run check                    # tsc --noEmit, then biome check .
 bun run lint:fix                 # Auto-fix lint and format issues
 bun run version                  # Sync package.json version into manifest.json + versions.json
@@ -28,7 +28,7 @@ bun test src/utils.test.ts       # Run one test file
 bun test -t "empty string"       # Run tests matching a name
 ```
 
-`build` and `dev` both overwrite the tracked `main.js`. `dev` writes an *unminified* bundle,
+`build` and `dev` both overwrite the tracked `main.js`. `dev` writes an _unminified_ bundle,
 so after using it run `bun run build` before committing or the CI diff fails.
 
 ## Architecture
@@ -36,7 +36,7 @@ so after using it run `bun run build` before committing or the CI diff fails.
 ### The committed bundle
 
 Obsidian has no build step: it loads `manifest.json` and `main.js` straight out of a vault's
-`.obsidian/plugins/<id>/`, so the committed `main.js` *is* the shipped plugin. Consequences,
+`.obsidian/plugins/<id>/`, so the committed `main.js` _is_ the shipped plugin. Consequences,
 in the order they bite:
 
 - `main.js` is tracked on purpose. Gitignoring it has been tried and reverted; do not "fix"
@@ -47,7 +47,8 @@ in the order they bite:
 - Bun is deliberately unpinned (`bun-version: latest` in the CI and release workflows), so a
   Bun release that shifts bundler output trips the same diff. The remedy is always rebuild
   and commit — never pin Bun to silence it.
-- `build.ts` externalizes `obsidian` and `electron` and emits CommonJS. Bundling either
+- The `build` and `dev` scripts call `bun build` directly — there is no build script file.
+  They externalize `obsidian` and `electron` and emit CommonJS. Bundling either
   module produces a broken plugin, not a large one.
 
 ### Version identity
@@ -64,8 +65,7 @@ Plugin lifecycle is exercised by Obsidian itself — never instantiate the `Plug
 tests. Test pure modules imported by `main.ts` (see `src/utils.ts` / `src/utils.test.ts` for
 the pattern). `bunfig.toml` preloads `src/test-preload.ts`, which `mock.module`s `obsidian` so
 a pure module that happens to sit beside an `obsidian` import still loads under `bun test`.
-Note that `tsconfig.json` excludes `*.test.ts`: test files are linted by Biome but not
-typechecked by `bun run check`.
+Test files are typechecked by `bun run check` along with the rest of `src/`.
 
 ### Release
 
