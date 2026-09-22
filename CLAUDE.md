@@ -57,7 +57,9 @@ in the order they bite:
 (`version-bump.ts`) is the only writer of `manifest.json` and `versions.json`.
 `versions.json` is not a changelog — it maps each plugin version to the `minAppVersion` that
 build requires, and Obsidian reads it to serve older builds to older apps. It is append-only;
-pruning it strands users. Nothing checks that a release tag matches `manifest.json`.
+pruning it strands users. The release workflow refuses a tag that disagrees with
+`package.json`, `manifest.json` or `versions.json`, so a skipped `bun run version` fails the
+release rather than shipping a mislabelled manifest.
 
 ### Testing
 
@@ -69,11 +71,11 @@ Test files are typechecked by `bun run check` along with the rest of `src/`.
 
 ### Release
 
-Use the `obsidian-gate` then `obsidian-ship` skills — do not tag by hand.
-`.github/workflows/release.yml` fires on any tag (Obsidian convention is bare semver, no `v`
-prefix) and uploads exactly `main.js` and `manifest.json` with `fail_on_unmatched_files`. A
-plugin that grows a `styles.css` — a static file, not a build output — must have it added to
-that list.
+Use the `release-gate` then `release-ship` skills — do not tag by hand.
+`.github/workflows/release.yml` fires only on bare-semver tags (`1.2.3`; Obsidian convention
+is no `v` prefix), checks the tag against the three version files, rebuilds and requires the
+result to match the committed `main.js`, runs the tests, and uploads `main.js`,
+`manifest.json` and — if the plugin has one — `styles.css`.
 
 ## Code Style
 
