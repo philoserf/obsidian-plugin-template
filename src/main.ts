@@ -6,9 +6,9 @@ type PluginSettings = Record<string, never>;
 const DEFAULT_SETTINGS: PluginSettings = {};
 
 export default class ExamplePlugin extends Plugin {
-  settings: PluginSettings = DEFAULT_SETTINGS;
+  override settings: PluginSettings = DEFAULT_SETTINGS;
 
-  async onload(): Promise<void> {
+  override async onload(): Promise<void> {
     await this.loadSettings();
 
     // This adds a simple command that can be triggered by the user (e.g., from the Command Palette).
@@ -52,7 +52,7 @@ class ExampleSettingTab extends PluginSettingTab {
     this.plugin = plugin;
   }
 
-  display(): void {
+  override display(): void {
     this.containerEl.empty();
   }
 }
