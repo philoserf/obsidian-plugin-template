@@ -7,8 +7,8 @@
   "license": "MIT",
   "scripts": {
     "audit": "bun audit --audit-level=critical",
-    "dev": "bun run build.ts --watch",
-    "build": "bun run check && bun run build.ts",
+    "dev": "bun build src/main.ts --outdir . --format cjs --external obsidian --external electron --watch",
+    "build": "bun run check && bun build src/main.ts --outdir . --format cjs --external obsidian --external electron --minify",
     "check": "bun run typecheck && biome check .",
     "typecheck": "tsc --noEmit",
     "lint": "biome check .",
@@ -22,7 +22,6 @@
   "devDependencies": {
     "@biomejs/biome": "^2.5.11",
     "@types/bun": "^1.4.0",
-    "@types/node": "^26.4.0",
     "obsidian": "^1.13.1",
     "typescript": "^7.0.2"
   }
