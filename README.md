@@ -1,5 +1,7 @@
 # Obsidian Plugin Template
 
+![Status: Stable](https://img.shields.io/badge/Status-Stable-brightgreen.svg)
+
 Minimal template for Obsidian plugins using Bun.
 
 ## Setup
