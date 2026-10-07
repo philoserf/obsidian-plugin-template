@@ -6,4 +6,12 @@ mock.module("obsidian", () => ({
     hide() {}
   },
   PluginSettingTab: class PluginSettingTab {},
+  SecretComponent: class SecretComponent {
+    setValue() {
+      return this;
+    }
+    onChange() {
+      return this;
+    }
+  },
 }));
