@@ -4,14 +4,13 @@
 
 ### Fixed
 
-- Restore main.js to version control
+- Keep the built main.js tracked: Obsidian loads the committed bundle directly
 - Add types to tsconfig for TypeScript 6 compatibility
 
 ### Changed
 
 - Use Bun APIs in version-bump.ts
 - Upgrade actions/checkout v4 to v6 in Claude workflows
-- Gitignore main.js build artifact
 - CI workflow updates
 - Remove validate-plugin script
 - Update dependencies
