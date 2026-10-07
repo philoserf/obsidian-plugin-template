@@ -1,6 +1,6 @@
 # Obsidian Plugin Template Walkthrough
 
-*2026-09-09T21:46:24Z by Showboat 0.6.1*
+_2026-09-09T21:46:24Z by Showboat 0.6.1_
 <!-- showboat-id: 3584bb7e-d19a-442b-984a-fa995a7aedcb -->
 
 ## Overview
@@ -10,7 +10,7 @@ This repository is a **template** for building [Obsidian](https://obsidian.md) p
 things in `manifest.json`, and you have a working plugin with a command, a ribbon icon, a
 settings tab, a test harness, and a full CI/release pipeline.
 
-Because it is a template, most of what you will read below is a *worked example* rather
+Because it is a template, most of what you will read below is a _worked example_ rather
 than a feature: `greet()`, `ExamplePlugin`, and the placeholder plugin id exist to show
 where your own code goes.
 
@@ -22,12 +22,12 @@ shape of the release workflow — all covered below.
 
 **Entry points**
 
-| Path                 | Role                                                       |
-| -------------------- | ---------------------------------------------------------- |
-| `src/main.ts`        | Plugin source entry — bundled into `main.js`                |
-| `build.ts`           | Bun bundler script (`bun run build` / `bun run dev`)        |
-| `version-bump.ts`    | Version sync, invoked only via `bun run version`            |
-| `manifest.json`      | What Obsidian reads to identify and load the plugin         |
+| Path              | Role                                                 |
+| ----------------- | ---------------------------------------------------- |
+| `src/main.ts`     | Plugin source entry — bundled into `main.js`         |
+| `build.ts`        | Bun bundler script (`bun run build` / `bun run dev`) |
+| `version-bump.ts` | Version sync, invoked only via `bun run version`     |
+| `manifest.json`   | What Obsidian reads to identify and load the plugin  |
 
 ## Architecture
 
@@ -298,7 +298,7 @@ mock.module("obsidian", () => ({
 ```
 
 Nothing in the current test suite needs this: `utils.test.ts` imports only `./utils`, which
-imports nothing. The preload is here so that the *next* pure module — one that happens to
+imports nothing. The preload is here so that the _next_ pure module — one that happens to
 sit in a file that also imports a type or a class from `obsidian` — can be loaded under
 `bun test` without the import failing at module-evaluation time. It is not a way to test the
 plugin class; that is the thing the rule above rules out.
@@ -330,7 +330,7 @@ Reading those options against what Obsidian expects:
   `manifest.json` — the exact pair Obsidian loads
 - `format: "cjs"` because Obsidian's plugin loader evaluates CommonJS
 - `external: ["obsidian", "electron"]` because Obsidian supplies both modules at load time.
-  Bundling either produces a *broken* plugin, not merely a large one
+  Bundling either produces a _broken_ plugin, not merely a large one
 - `minify: !watch` keeps the dev build readable and the production build small
 
 The remainder is failure handling — a non-zero exit is what makes `bun run build` fail CI:
@@ -428,7 +428,7 @@ not a bug.
 
 The script then does two different things:
 
-- **`manifest.json`** gets its `version` field overwritten. It also *reads* `minAppVersion`
+- **`manifest.json`** gets its `version` field overwritten. It also _reads_ `minAppVersion`
   from here, because the manifest is where a human declares the minimum Obsidian version.
 - **`versions.json`** gets a new key appended: `versions[targetVersion] = minAppVersion`.
 
@@ -454,7 +454,7 @@ so resist the urge to "clean it up" down to the current release.
 ## 8. Release: `release.yml`
 
 A tag push triggers a build and publishes a GitHub release. The upload list is the
-definition of what a plugin *is* on this side of the boundary:
+definition of what a plugin _is_ on this side of the boundary:
 
 ```bash
 sed -n '21,31p' .github/workflows/release.yml
@@ -475,8 +475,8 @@ sed -n '21,31p' .github/workflows/release.yml
 ```
 
 Exactly two files: `main.js` and `manifest.json`. `fail_on_unmatched_files: true` fails the
-release if a listed file is missing — but note it cannot catch a file that is *absent from
-the list*. This is the trap flagged back in section 2: a plugin that grows a `styles.css`
+release if a listed file is missing — but note it cannot catch a file that is _absent from
+the list_. This is the trap flagged back in section 2: a plugin that grows a `styles.css`
 and does not amend these lines releases silently unstyled.
 
 Nothing here verifies that the pushed tag matches the version in `manifest.json`; the tag is
@@ -601,4 +601,3 @@ test restructuring in commits `d32a6aa` and `f2bc2af`. It was regenerated rather
 | 2   | low      | `settings-tab-is-registered-but-demonstrates-nothing`       | `src/main.ts:35,47-58`                |
 
 **Total: 2 issues (0 critical, 0 high, 1 medium, 1 low)**
-
