@@ -1,198 +1,157 @@
 # Obsidian Plugin Template Walkthrough
 
-_2026-09-09T21:46:24Z by Showboat 0.6.1_
-<!-- showboat-id: 3584bb7e-d19a-442b-984a-fa995a7aedcb -->
-
 ## Overview
 
 This repository is a **template** for building [Obsidian](https://obsidian.md) plugins with
-[Bun](https://bun.sh) as both the build tool and the test runner. Copy it, rename a few
-things in `manifest.json`, and you have a working plugin with a command, a ribbon icon, a
-settings tab, a test harness, and a full CI/release pipeline.
+[Bun](https://bun.sh) as the bundler, script runner and test runner. Copying it gives you a working plugin
+with a command, a ribbon icon, a declarative settings tab with a keychain-backed credential
+row, a test harness, and a CI and release pipeline.
 
-Because it is a template, most of what you will read below is a _worked example_ rather
-than a feature: `greet()`, `ExamplePlugin`, and the placeholder plugin id exist to show
-where your own code goes.
+Most of what follows is a _worked example_, not a feature. `greet()`, `ExamplePlugin`, the
+example settings and the placeholder plugin id show where your own code goes. The settings
+tab is also the pattern the philoserf plugins port to.
 
-The one thing to understand before anything else: **Obsidian does not build plugins.** It
-loads a folder from a vault's `.obsidian/plugins/<id>/` directory containing `manifest.json`
-and `main.js`, and runs that JavaScript directly. There is no install step on the user's
-machine. That single fact explains the committed build artifact, the CI diff check, and the
-shape of the release workflow — all covered below.
+One fact explains most of the repository's shape: **Obsidian does not build plugins.** It
+loads `manifest.json` and `main.js` straight out of a vault's `.obsidian/plugins/<id>/` folder
+and runs that JavaScript. Nothing gets installed or built on the user's machine. That is why
+the bundle is committed, why CI diffs it, and why the release workflow looks the way it does.
 
 **Entry points**
 
-| Path              | Role                                                 |
-| ----------------- | ---------------------------------------------------- |
-| `src/main.ts`     | Plugin source entry — bundled into `main.js`         |
-| `build.ts`        | Bun bundler script (`bun run build` / `bun run dev`) |
-| `version-bump.ts` | Version sync, invoked only via `bun run version`     |
-| `manifest.json`   | What Obsidian reads to identify and load the plugin  |
+| Path              | Role                                                        |
+| ----------------- | ----------------------------------------------------------- |
+| `manifest.json`   | What Obsidian reads to identify and load the plugin         |
+| `src/main.ts`     | Plugin source entry, bundled into `main.js`                 |
+| `package.json`    | The `build`, `dev`, `check`, `version` and `test` scripts   |
+| `version-bump.ts` | Version sync, run only through `bun run version`            |
+| `.github/`        | CI (`main.yml`), release (`release.yml`), Dependabot config |
 
 ## Architecture
 
-Four tracked TypeScript files, three of them at the repository root. There is no framework
-and no plugin abstraction layer — the whole project is small enough to read in one sitting.
-
-```bash
-cat <<'HEREDOC'
+```text
 .
 ├── src/
-│   ├── main.ts           # Plugin class — the bundler entry point
-│   ├── utils.ts          # Pure helper module (the testable layer)
-│   ├── utils.test.ts     # Bun test for the pure layer
-│   └── test-preload.ts   # Stubs the 'obsidian' module for bun test
-├── build.ts              # Bun bundler script
-├── version-bump.ts       # Syncs package.json version -> manifest + versions
+│   ├── main.ts           # Plugin class, secretStatus(), settings tab — the bundle entry
+│   ├── utils.ts          # greet(): a pure module with no obsidian import
+│   ├── utils.test.ts     # Tests for the pure module
+│   ├── settings.test.ts  # Tests the settings tab as data
+│   └── test-preload.ts   # Stubs the 'obsidian' module under bun test
+├── version-bump.ts       # package.json version -> manifest.json + versions.json
 ├── main.js               # Built bundle — COMMITTED, Obsidian loads this
 ├── manifest.json         # Obsidian plugin manifest
 ├── versions.json         # plugin version -> minimum Obsidian version
 ├── bunfig.toml           # Registers the test preload
-├── tsconfig.json         # strict, ESNext, bundler resolution
-├── biome.json            # Lint + format
-└── .github/workflows/
-    ├── main.yml          # CI: audit, build, main.js diff gate, test
-    ├── release.yml       # Tag push -> GitHub release
-    └── claude.yml        # @claude mentions on issues and PRs
-HEREDOC
+├── tsconfig.json         # strict TypeScript, checker only
+├── biome.json            # Lint + format for code and JSON
+├── .prettierrc.json      # Format for Markdown
+└── .github/
+    ├── dependabot.yml
+    └── workflows/
+        ├── main.yml      # CI: build, main.js diff gate, test; Dependabot rebuild
+        └── release.yml   # Bare-semver tag -> verified GitHub release
 ```
 
-```output
-.
-├── src/
-│   ├── main.ts           # Plugin class — the bundler entry point
-│   ├── utils.ts          # Pure helper module (the testable layer)
-│   ├── utils.test.ts     # Bun test for the pure layer
-│   └── test-preload.ts   # Stubs the 'obsidian' module for bun test
-├── build.ts              # Bun bundler script
-├── version-bump.ts       # Syncs package.json version -> manifest + versions
-├── main.js               # Built bundle — COMMITTED, Obsidian loads this
-├── manifest.json         # Obsidian plugin manifest
-├── versions.json         # plugin version -> minimum Obsidian version
-├── bunfig.toml           # Registers the test preload
-├── tsconfig.json         # strict, ESNext, bundler resolution
-├── biome.json            # Lint + format
-└── .github/workflows/
-    ├── main.yml          # CI: audit, build, main.js diff gate, test
-    ├── release.yml       # Tag push -> GitHub release
-    └── claude.yml        # @claude mentions on issues and PRs
-```
+Data flows one way: `src/*.ts` → `bun build` → `main.js` → a GitHub release → a vault. At
+runtime the plugin's only state is `data.json`, which it reads and writes through Obsidian's
+`loadData()`/`saveData()`. Credential values are the exception: they live in Obsidian's
+keychain, and `data.json` holds only a secret's name.
 
 ## 1. Where Obsidian starts: `manifest.json`
 
 Obsidian scans each plugin folder for `manifest.json`. It identifies the plugin by `id`,
-shows `name` and `description` in the settings UI, and refuses to load the plugin if the
-running app is older than `minAppVersion`. `isDesktopOnly: false` declares that the plugin
-works on mobile.
+shows `name` and `description` in the settings UI, and refuses to load the plugin on an app
+older than `minAppVersion`. `isDesktopOnly: false` declares mobile support.
 
-The `id`, `name`, and `description` here are placeholders — they are the first thing you
-change after copying the template.
+`manifest.json`
 
-```bash
-cat manifest.json
-```
-
-```output
+```json
 {
   "id": "your-plugin-id",
   "name": "Your Plugin Name",
-  "version": "1.0.1",
-  "minAppVersion": "1.0.0",
+  "version": "1.1.0",
+  "minAppVersion": "1.13.0",
   "description": "A brief description of your plugin",
-  "author": "Mark Ayers",
-  "authorUrl": "https://github.com/philoserf",
-  "isDesktopOnly": false
-}
 ```
+
+`minAppVersion` is `1.13.0` because the settings tab below uses `getSettingDefinitions()`,
+which Obsidian added in 1.13.0. `id`, `name` and `description` are placeholders, the first
+row of the README's copier checklist.
 
 ## 2. The plugin entry point: `src/main.ts`
 
-`main.ts` exports a default class extending Obsidian's `Plugin`. Obsidian instantiates it
-and calls `onload()`; the plugin never constructs itself. Note that `settings` is typed
-`Record<string, never>` — a deliberate "this template has no settings yet" marker that lets
-the empty `DEFAULT_SETTINGS` type-check. Widening that type is step one when you add a real
-setting.
+### Settings shape and defaults
 
-```bash
-sed -n '1,13p' src/main.ts
+The file opens with the settings type and its defaults. The comment on `apiKeySecret` states
+the credential rule the whole tab is built around: `data.json` is plaintext and syncs, so it
+may hold a secret's _ID_ and never the secret itself.
+
+`src/main.ts` — `PluginSettings`, `DEFAULT_SETTINGS`
+
+```typescript
+interface PluginSettings {
+  name: string;
+  greeting: string;
+  greetOnLoad: boolean;
+  // The ID of a secret in app.secretStorage, never the secret itself:
+  // data.json is plaintext and syncs. Read it with
+  // this.app.secretStorage.getSecret(this.settings.apiKeySecret).
+  apiKeySecret: string;
+}
+
+const DEFAULT_SETTINGS: PluginSettings = {
+  name: "Obsidian User",
+  greeting: "Hello",
+  greetOnLoad: false,
+  apiKeySecret: "",
+};
 ```
 
-```output
-import { Notice, Plugin, PluginSettingTab } from "obsidian";
-import { greet } from "./utils";
+### `onload`: what the plugin registers
 
-type PluginSettings = Record<string, never>;
+Obsidian constructs the default-exported class and calls `onload()`. The plugin never
+constructs itself. `onload` loads settings first, because everything after it reads them.
+It then registers three extension points, each a different Obsidian API:
 
-const DEFAULT_SETTINGS: PluginSettings = {};
+- `addCommand` adds a Command Palette entry, keyed by `id`.
+- `addRibbonIcon` adds a left-ribbon icon and returns its element, so a CSS class can be
+  attached.
+- `addSettingTab` registers the settings pane described in section 4.
 
-export default class ExamplePlugin extends Plugin {
-  settings: PluginSettings = DEFAULT_SETTINGS;
+`src/main.ts` — `ExamplePlugin.onload`
 
-  async onload(): Promise<void> {
+```typescript
+  override async onload(): Promise<void> {
     await this.loadSettings();
 
-```
-
-### The three extension points `onload` registers
-
-Everything the plugin contributes to Obsidian is registered here, and each of the three is
-a worked example of a different Obsidian API:
-
-- `addCommand` puts an entry in the Command Palette, keyed by `id`
-- `addRibbonIcon` puts a clickable icon in the left ribbon and returns the DOM element, so
-  you can attach a CSS class to it
-- `addSettingTab` registers a pane under Obsidian's plugin settings
-
-Obsidian unregisters all three automatically when the plugin unloads, which is why there is
-no `onunload` in this template.
-
-```bash
-sed -n '14,36p' src/main.ts
-```
-
-```output
     // This adds a simple command that can be triggered by the user (e.g., from the Command Palette).
     this.addCommand({
       id: "greet-command",
       name: "Greet the user",
-      callback: () => {
-        new Notice(greet("Obsidian User"));
-      },
+      callback: () => this.greet(),
     });
-
-    // This adds a ribbon icon to the left ribbon.
-    const ribbonIconEl = this.addRibbonIcon(
-      "bell",
-      "Greet via Ribbon Icon",
-      (_evt: MouseEvent) => {
-        // Called when the user clicks the icon.
-        new Notice(greet("Ribbon Clicker"));
-      },
-    );
-    // Perform some extra configuration on the ribbon icon element if necessary.
+    ...
     ribbonIconEl.addClass("my-plugin-ribbon-class");
 
     this.addSettingTab(new ExampleSettingTab(this.app, this));
+
+    if (this.settings.greetOnLoad) this.greet();
   }
 ```
 
-Note `ribbonIconEl.addClass("my-plugin-ribbon-class")` on the last line: the hook for
-styling exists, but there is no `styles.css` in the template. If you add one, remember that
-Obsidian loads it as a third file from the plugin folder — it must also be added to the
-release workflow's upload list (see section 8), or your plugin ships unstyled.
+Obsidian unregisters all three on unload, which is why the template has no `onunload`. The
+`override` keywords come from `noImplicitOverride` in `tsconfig.json`. Even `settings` takes
+one, because Obsidian 1.13's `Plugin` declares an optional `settings?: unknown` field.
 
-### Settings persistence
+The command, the ribbon icon, the "Greet now" settings row and `greetOnLoad` all reach the
+same method:
 
-`loadData()` and `saveData()` are Obsidian's per-plugin JSON store. The merge over
-`DEFAULT_SETTINGS` is the standard pattern for tolerating a settings file written by an
-older version of the plugin. `saveSettings()` is defined but never called — it is
-scaffolding for the settings controls you will add to the tab below.
+`src/main.ts` — `ExamplePlugin.greet`, `loadSettings`, `saveSettings`
 
-```bash
-sed -n '38,58p' src/main.ts
-```
+```typescript
+  greet(): void {
+    new Notice(greet(this.settings.name, this.settings.greeting));
+  }
 
-```output
   async loadSettings(): Promise<void> {
     this.settings = Object.assign({}, DEFAULT_SETTINGS, await this.loadData());
   }
@@ -200,177 +159,281 @@ sed -n '38,58p' src/main.ts
   async saveSettings(): Promise<void> {
     await this.saveData(this.settings);
   }
-}
+```
 
-class ExampleSettingTab extends PluginSettingTab {
+`loadSettings` merges the stored data over `DEFAULT_SETTINGS`, so a `data.json` written by an
+older version gets defaults for any keys it lacks. It does not check the stored values. See
+section 4 for what that means for the `Name` row.
+
+## 3. The pure layer: `src/utils.ts`
+
+`ExamplePlugin.greet` is a shell around a function from a module that imports nothing from
+`obsidian`:
+
+`src/utils.ts` — `greet`
+
+```typescript
+export function greet(name: string, greeting = "Hello"): string {
+  return `${greeting}, ${name}!`;
+}
+```
+
+That split is the template's testing strategy (section 6). Obsidian-facing code stays a thin
+registration layer, and the logic lives where `bun test` can reach it directly.
+
+## 4. The settings tab: definitions, not `display()`
+
+### The tab is data
+
+`ExampleSettingTab` has no `display()`. Since Obsidian 1.13.0 a tab can return
+`getSettingDefinitions()` instead. Obsidian renders the definitions, indexes every row for
+settings search, and saves each `control` row into `plugin.settings[key]` itself. Once
+definitions are returned, `display()` is deprecated and never called. The comment above the
+class says this in four lines:
+
+`src/main.ts` — `ExampleSettingTab`
+
+```typescript
+// Declarative settings (Obsidian 1.13.0): the tab is data. Obsidian renders
+// it, indexes every row for settings search, and saves each `control` row to
+// plugin.settings[key] itself. A `render` row is drawn by hand and saves
+// nothing on its own.
+export class ExampleSettingTab extends PluginSettingTab {
   plugin: ExamplePlugin;
 
   constructor(app: Plugin["app"], plugin: ExamplePlugin) {
     super(app, plugin);
     this.plugin = plugin;
   }
+```
 
-  display(): void {
-    this.containerEl.empty();
+The method returns two groups. Each row in **Greeting** shows a different kind:
+
+| Row              | Kind                | Saves to               |
+| ---------------- | ------------------- | ---------------------- |
+| Name             | `text` control      | `settings.name`        |
+| Greeting         | `dropdown` control  | `settings.greeting`    |
+| Greet on startup | `toggle` control    | `settings.greetOnLoad` |
+| Greet now        | `action` (a button) | nothing                |
+
+The text row also carries a validator:
+
+`src/main.ts` — `ExampleSettingTab.getSettingDefinitions`, the `Name` row
+
+```typescript
+            control: {
+              type: "text",
+              key: "name",
+              placeholder: DEFAULT_SETTINGS.name,
+              // Rejects the edit in the UI only. A stored value is never
+              // repaired, so anything that must hold is checked on load too.
+              validate: (value) =>
+                value.trim() === "" ? "Name cannot be empty." : undefined,
+            },
+```
+
+The comment matches Obsidian's own typings. `validate` runs when the row mounts and on each
+edit, and it never rewrites the stored value. An empty `name` that reaches `data.json` some
+other way, such as a hand edit, a sync conflict or an older version, survives `loadSettings`
+and greets as `Hello, !`. The template states the load-time rule here but does not
+demonstrate it in `loadSettings`, which this pass filed (see Findings).
+
+### The credential row: `render`, `SecretComponent` and `secretStatus`
+
+There is no declarative secret control. The **Credentials** group's only row is a `render`
+row, drawn by hand and saved by hand. It puts a `SecretComponent`, Obsidian's keychain picker,
+into the row's control area. The component reports a secret's _ID_ on change, and only that
+ID is written to settings, so the secret's value never touches `data.json`.
+
+`src/main.ts` — `ExampleSettingTab.getSettingDefinitions`, the `API key` row
+
+```typescript
+          {
+            name: "API key",
+            desc: secretStatus(
+              this.plugin.settings.apiKeySecret,
+              this.app.secretStorage.listSecrets(),
+              "your-plugin-api-key",
+            ),
+            // There is no declarative secret control, so this row is
+            // rendered by hand, and saves by hand.
+            render: (setting) => {
+              new SecretComponent(this.app, setting.controlEl)
+                .setValue(this.plugin.settings.apiKeySecret)
+                .onChange(async (id) => {
+                  this.plugin.settings.apiKeySecret = id;
+                  await this.plugin.saveSettings();
+                  // Re-render so the description reports the new secret.
+                  this.update();
+                });
+            },
+          },
+```
+
+The row's description comes from `secretStatus`, a pure function that sits in `main.ts`
+next to the tab it serves. Its doc comment states the problem it solves. A secret's _name_
+syncs with `data.json`, but its _value_ stays on the device that stored it. On a second
+device the row can point at a name that device's keychain lacks, and Settings → Keychain is
+a separate screen that would not say so.
+
+`src/main.ts` — `secretStatus`
+
+```typescript
+export function secretStatus(
+  id: string,
+  onDevice: readonly string[],
+  suggested: string,
+): string {
+  if (!id) {
+    return `Choose or create a keychain secret. Naming it "${suggested}" lets other plugins use the same one.`;
   }
+  return onDevice.includes(id)
+    ? `Uses the keychain secret "${id}".`
+    : `This device's keychain has no secret named "${id}". Add it in Settings → Keychain under that name, or choose another secret here.`;
 }
 ```
 
-## 3. The pure layer: `src/utils.ts`
+It has three outcomes: no secret chosen (suggest a shareable name), chosen and present
+(confirm it), and chosen but missing on this device (say what to add). It reads
+`listSecrets()`, which returns names only and never calls `getSecret`, so the settings
+screen never loads a credential value.
 
-Both callbacks in `onload` delegate to `greet()`. That indirection is the point of the
-template's testing strategy: the Obsidian-facing code stays a thin registration shell, and
-the logic lives in modules that import nothing from `obsidian` and can be tested directly.
+### Why `this.update()` is there
 
-```bash
-cat src/utils.ts
+A description is computed when `getSettingDefinitions()` runs, not when the row repaints. In
+Obsidian's typings, `update()` "stores the result of getSettingDefinitions() for rendering
+and search indexing", and `addSettingTab()` calls it once. Without the explicit
+`this.update()` in `onChange`, picking a secret would save the new ID but leave the
+description reporting the old one until the tab was rebuilt. Calling `update()` re-runs the
+definitions, so `secretStatus` sees the new ID. That is also why the method carries the
+comment "Runs on every update(), so keep it cheap": `listSecrets()` is the only lookup in
+it.
+
+The control rows do not need this, because Obsidian saves them and their descriptions are
+static.
+
+## 5. The build: two `bun build` lines
+
+No build script file exists. `package.json`'s scripts call `bun build` directly:
+
+`package.json` — `scripts.dev`, `scripts.build`, `scripts.check`
+
+```json
+    "dev": "bun build src/main.ts --outdir . --format cjs --external obsidian --external electron --watch",
+    "build": "bun run check && bun build src/main.ts --outdir . --format cjs --external obsidian --external electron --minify",
+    "check": "bun run typecheck && biome check . && prettier --check \"**/*.md\"",
 ```
 
-```output
-/**
- * A simple utility function to demonstrate testing and basic plugin functionality.
- * @param name The name to greet.
- * @returns A greeting string.
- */
-export function greet(name: string): string {
-  return `Hello, ${name}!`;
-}
-```
+Read the flags against what Obsidian expects:
 
-## 4. Testing: the boundary and why it is drawn there
+- `--outdir .` writes `main.js` to the repository root, next to `manifest.json`, which is
+  the pair Obsidian loads.
+- `--format cjs`, because Obsidian's plugin loader evaluates CommonJS.
+- `--external obsidian --external electron`, because Obsidian supplies both modules at load
+  time. Bundling either produces a _broken_ plugin, not just a large one.
+- `build` minifies; `dev` watches and stays unminified.
 
-`CLAUDE.md` states the rule in one line: **never instantiate the `Plugin` class in tests.**
-`Plugin` belongs to the Obsidian runtime, and its lifecycle is driven by the application. A
-test that constructs one is testing a stub of Obsidian, not the plugin, and it passes for
-reasons unrelated to whether the plugin works. The project learned this and removed such a
-test — see commit `f2bc2af`, "test: drop misleading Plugin-instantiation test".
+`build` runs `check` first. That is `tsc --noEmit` (strict, with `noUncheckedIndexedAccess`
+and `exactOptionalPropertyTypes`), `biome check .` over everything git does not ignore
+except `main.js`, and prettier over Markdown. Test files are in `tsconfig.json`'s
+`src/**/*.ts` include, so they are typechecked too.
 
-So tests target pure modules only. `src/utils.test.ts` is the pattern to copy:
+`dev` overwrites the tracked `main.js` with an unminified bundle. Run `bun run build` before
+committing.
 
-```bash
-cat src/utils.test.ts
-```
+## 6. Testing
 
-```output
-import { expect, test } from "bun:test";
-import { greet } from "./utils";
+### The boundary
 
-test("greet function returns a greeting", () => {
-  expect(greet("World")).toBe("Hello, World!");
-  expect(greet("Obsidian")).toBe("Hello, Obsidian!");
-});
+**Never instantiate the `Plugin` class in tests.** Obsidian drives its lifecycle, and a test
+that constructs one is testing a stub. Tests target pure functions, plus one class whose
+output is plain data. `src/utils.test.ts` covers `greet`, including its default greeting.
 
-test("greet function handles empty string", () => {
-  expect(greet("")).toBe("Hello, !");
-});
-```
+### The `obsidian` stub
 
-### The `obsidian` module stub
+`bunfig.toml` preloads `src/test-preload.ts` before every test file. The `obsidian` module
+exists only inside the app, so without a stub any file that imports it fails at module
+evaluation:
 
-`bunfig.toml` registers a preload that runs before any test file:
+`src/test-preload.ts`
 
-```bash
-cat bunfig.toml
-```
-
-```output
-[test]
-preload = ["./src/test-preload.ts"]
-```
-
-The preload replaces the `obsidian` module — which only exists inside the Obsidian app and
-would otherwise fail to resolve under `bun test` — with minimal stub classes:
-
-```bash
-cat src/test-preload.ts
-```
-
-```output
-import { mock } from "bun:test";
-
+```typescript
 mock.module("obsidian", () => ({
   Plugin: class Plugin {},
   Notice: class Notice {
     hide() {}
   },
-  PluginSettingTab: class PluginSettingTab {},
+  // The real constructor keeps the app; the secret row reads its keychain.
+  PluginSettingTab: class PluginSettingTab {
+    app: unknown;
+    constructor(app?: unknown) {
+      this.app = app;
+    }
+  },
+  SecretComponent: class SecretComponent {
+    setValue() {
+      return this;
+    }
+    onChange() {
+      return this;
+    }
+  },
 }));
 ```
 
-Nothing in the current test suite needs this: `utils.test.ts` imports only `./utils`, which
-imports nothing. The preload is here so that the _next_ pure module — one that happens to
-sit in a file that also imports a type or a class from `obsidian` — can be loaded under
-`bun test` without the import failing at module-evaluation time. It is not a way to test the
-plugin class; that is the thing the rule above rules out.
+Every _value_ import from `obsidian` needs an entry here. Type imports such as
+`SettingDefinitionItem` are erased. The `PluginSettingTab` stub keeps `app` because
+`getSettingDefinitions()` reads `this.app.secretStorage` for the credential row's
+description.
 
-## 5. The build: `build.ts`
+### The settings tab, tested as data
 
-`bun run build` runs `bun run check && bun run build.ts`; `bun run dev` runs the same script
-with `--watch`. The script is nineteen lines and the first nine carry all the decisions:
+Because the tab is data, `src/settings.test.ts` builds it with a stand-in plugin and a
+stand-in app whose keychain is empty, and asserts on the returned definitions. No DOM is
+involved:
 
-```bash
-sed -n '1,9p' build.ts
-```
+`src/settings.test.ts` — `definitions`
 
-```output
-const watch = process.argv.includes("--watch");
-
-const result = await Bun.build({
-  entrypoints: ["src/main.ts"],
-  outdir: ".",
-  format: "cjs",
-  external: ["obsidian", "electron"],
-  minify: !watch,
-});
-```
-
-Reading those options against what Obsidian expects:
-
-- `outdir: "."` writes the bundle to the repository root as `main.js`, next to
-  `manifest.json` — the exact pair Obsidian loads
-- `format: "cjs"` because Obsidian's plugin loader evaluates CommonJS
-- `external: ["obsidian", "electron"]` because Obsidian supplies both modules at load time.
-  Bundling either produces a _broken_ plugin, not merely a large one
-- `minify: !watch` keeps the dev build readable and the production build small
-
-The remainder is failure handling — a non-zero exit is what makes `bun run build` fail CI:
-
-```bash
-sed -n '11,19p' build.ts
-```
-
-```output
-if (!result.success) {
-  console.error("Build failed");
-  for (const message of result.logs) console.error(message);
-  process.exit(1);
+```typescript
+function definitions(): SettingDefinitionItem[] {
+  const plugin = { settings: {}, greet() {} } as unknown as ExamplePlugin;
+  return new ExampleSettingTab(
+    {
+      secretStorage: { listSecrets: () => [] },
+    } as unknown as ExamplePlugin["app"],
+    plugin,
+  ).getSettingDefinitions();
 }
-
-if (watch) console.log("Watching for changes...");
-
-export {};
 ```
 
-The trailing `export {}` is not decoration: it marks the file as an ES module so the
-top-level `await Bun.build(...)` on line 3 is legal. `version-bump.ts` ends the same way for
-the same reason.
+The tests check four things: the group headings; which keys the control rows bind; the
+`Name` validator; and that the API key row is a `render` row, not a `control`. That last one
+matters, because a `control` row would auto-save the value itself into `data.json`.
+`secretStatus` gets one test per outcome.
 
-## 6. The committed bundle, and the CI gate that protects it
+Transcript of `bun test`, run while writing this document:
 
-`main.js` is a **tracked file**. This is the most counterintuitive thing in the repository
-and the one most likely to be "fixed" by someone applying general good practice — it has
-already been gitignored once (commit `673cbaa`) and restored (commit `3081162`), and GitHub
-issue #28 proposing the same change is closed.
+```text
+bun test v1.4.2 (43848b5a7)
 
-It is tracked because Obsidian ships the built bundle: there is no build step between this
-repository and a user's vault. A committed artifact can go stale, so CI refuses to let it:
-
-```bash
-sed -n '17,27p' .github/workflows/main.yml
+ 11 pass
+ 0 fail
+ 14 expect() calls
+Ran 11 tests across 2 files. [14.00ms]
 ```
 
-```output
-      - run: bun install
+## 7. The committed bundle, and the CI gate that protects it
+
+`main.js` is a **tracked file**. It is the thing most likely to be "fixed" by someone
+applying general good practice. It was gitignored once (commit `673cbaa`) and restored
+(commit `3081162`), and issue #28 proposing the same change is closed.
+
+Because Obsidian ships the committed bundle, CI refuses a stale one:
+
+`.github/workflows/main.yml` — `jobs.check`
+
+```yaml
+      - run: bun install --frozen-lockfile
       - run: bun audit --audit-level=critical
       # `build` is check + bundle. The diff then fails the PR when the committed
       # main.js does not match a fresh build — Obsidian ships the committed
@@ -383,27 +446,36 @@ sed -n '17,27p' .github/workflows/main.yml
       - run: bun test
 ```
 
-`bun run build` rebuilds the bundle in place, and `git diff --exit-code main.js` then fails
-the pull request if the fresh build differs from the committed one. The in-file comment
-explains the second, subtler case: `bun-version: latest` is unpinned by choice, so a Bun
-release that shifts bundler output trips this check too. That is the same signal, not a
-false one — `release.yml` also builds with the latest Bun, so the committed bundle should
-match what a release would ship. The fix is always to rebuild and commit `main.js`, never to
-pin Bun to silence the diff.
+Dependabot bumps `package.json` and `bun.lock` but never rebuilds, so every bump to a bundled
+dependency would fail that diff. The `rebuild` job handles that case. On a Dependabot pull
+request it builds, commits `main.js` onto the PR branch, and dispatches CI for the new head,
+because a push made with `GITHUB_TOKEN` starts no workflow but a dispatch does:
 
-## 7. Version identity: three files, one writer
+`.github/workflows/main.yml` — `jobs.rebuild`, "Commit main.js and dispatch CI"
 
-`package.json`, `manifest.json`, and `versions.json` all carry version information. They are
-not three copies of one fact, and only `package.json` is edited by a human.
-`version-bump.ts` writes the other two, and it runs only as the `bun run version` lifecycle
-hook:
-
-```bash
-sed -n '1,17p' version-bump.ts
+```yaml
+        run: |
+          git diff --quiet main.js && exit 0
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -m "chore: rebuild main.js for the dependencies bump" main.js
+          git push
+          gh workflow run main.yml --ref "$GITHUB_HEAD_REF"
 ```
 
-```output
-const targetVersion = process.env.npm_package_version;
+A Bun release that shifts bundler output is deliberately not covered. Bun is unpinned on
+purpose, and the remedy there is a one-commit rebuild by hand, never a pin.
+
+## 8. Version identity: three files, one writer
+
+`package.json`, `manifest.json` and `versions.json` all carry version data, and a human edits
+only `package.json`. `version-bump.ts` writes the other two, run as `bun run version`, which
+sets `npm_package_version`. Run any other way, the script throws:
+
+`version-bump.ts`
+
+```typescript
+const targetVersion = Bun.env.npm_package_version;
 if (!targetVersion) {
   throw new Error("No version found in package.json");
 }
@@ -411,193 +483,100 @@ if (!targetVersion) {
 // Update manifest.json
 const manifest = await Bun.file("manifest.json").json();
 const { minAppVersion } = manifest;
-manifest.version = targetVersion;
-await Bun.write("manifest.json", `${JSON.stringify(manifest, null, 2)}\n`);
-
-// Update versions.json
-const versions = await Bun.file("versions.json").json();
-versions[targetVersion] = minAppVersion;
-await Bun.write("versions.json", `${JSON.stringify(versions, null, 2)}\n`);
-
-console.log(`Updated to version ${targetVersion}`);
+// JSON.stringify drops undefined values, so without this the versions.json
+// entry below would vanish silently and the script would still report success.
+if (typeof minAppVersion !== "string" || !minAppVersion) {
+  throw new Error("No minAppVersion found in manifest.json");
+}
 ```
 
-Line 1 reads `process.env.npm_package_version`, which the package manager sets only when the
-script is invoked through `bun run version`. Run any other way it throws — that is the guard,
-not a bug.
+It overwrites `manifest.json`'s `version` and appends `versions[targetVersion] =
+minAppVersion`. `versions.json` is not a changelog. It maps each plugin version to the
+oldest Obsidian that build runs on, and Obsidian reads it to serve older builds to older
+apps:
 
-The script then does two different things:
+`versions.json`
 
-- **`manifest.json`** gets its `version` field overwritten. It also _reads_ `minAppVersion`
-  from here, because the manifest is where a human declares the minimum Obsidian version.
-- **`versions.json`** gets a new key appended: `versions[targetVersion] = minAppVersion`.
-
-`versions.json` is the file most often misread. It is not a changelog and not a list of
-releases — it is a map from plugin version to the minimum Obsidian version that build
-requires, which Obsidian consults to decide which build of a plugin to hand a user on an
-older app:
-
-```bash
-cat versions.json
-```
-
-```output
+```json
 {
   "1.0.0": "1.0.0",
-  "1.0.1": "1.0.0"
+  "1.0.1": "1.0.0",
+  "1.1.0": "1.13.0"
 }
 ```
 
-The map is append-only by nature. Pruning old entries strands users on old Obsidian builds,
-so resist the urge to "clean it up" down to the current release.
+The `1.1.0` row is where the 1.13.0 floor from section 1 becomes visible to Obsidian. A user
+on 1.12 is offered `1.0.1`. The map is append-only, because pruning it strands those users.
 
-## 8. Release: `release.yml`
+## 9. Release: `release.yml`
 
-A tag push triggers a build and publishes a GitHub release. The upload list is the
-definition of what a plugin _is_ on this side of the boundary:
+Only a bare-semver tag starts a release. In GitHub's filter syntax `+` is a quantifier, so
+`v1.2.3`, `1.2` and `1.2.3-beta` all fail to match:
 
-```bash
-sed -n '21,31p' .github/workflows/release.yml
+`.github/workflows/release.yml` — `on`
+
+```yaml
+on:
+  push:
+    tags:
+      - "[0-9]+.[0-9]+.[0-9]+"
 ```
 
-```output
-      - run: |
-          bun install
-          bun run build
+The job then refuses to publish anything the repository does not agree with. The tag must
+equal the version in `package.json` and `manifest.json` and have a row in `versions.json`. The
+fresh build must match the committed `main.js`. The tests must pass. Only then does it collect
+the assets:
 
-      - name: Create release
-        uses: softprops/action-gh-release@v3
-        with:
-          files: |
-            main.js
-            manifest.json
-          fail_on_unmatched_files: true
+`.github/workflows/release.yml` — "Collect assets"
+
+```yaml
+          {
+            echo "files<<EOF"
+            echo main.js
+            echo manifest.json
+            if [ -f styles.css ]; then echo styles.css; fi
+            echo EOF
+          } >> "$GITHUB_OUTPUT"
 ```
 
-Exactly two files: `main.js` and `manifest.json`. `fail_on_unmatched_files: true` fails the
-release if a listed file is missing — but note it cannot catch a file that is _absent from
-the list_. This is the trap flagged back in section 2: a plugin that grows a `styles.css`
-and does not amend these lines releases silently unstyled.
-
-Nothing here verifies that the pushed tag matches the version in `manifest.json`; the tag is
-trusted. The trigger glob is `"*"`, which accepts the bare-semver tags Obsidian's community
-plugin convention expects — and anything else you happen to push.
-
-## 9. What `bun run check` actually covers
-
-`check` is `typecheck` (`tsc --noEmit`) plus `biome check .`, and `build` runs `check`
-first — so this is the gate every push passes through. Its coverage is set by two files.
-`tsconfig.json` first:
-
-```bash
-cat tsconfig.json
-```
-
-```output
-{
-  "compilerOptions": {
-    "target": "ESNext",
-    "lib": ["DOM", "ESNext"],
-    "module": "ESNext",
-    "moduleResolution": "bundler",
-    "types": ["bun", "node"],
-    "noEmit": true,
-    "strict": true,
-    "skipLibCheck": true
-  },
-  "include": ["src/**/*.ts", "build.ts", "version-bump.ts"],
-  "exclude": ["src/**/*.test.ts"]
-}
-```
-
-`strict: true` with `moduleResolution: "bundler"` matches how Bun resolves imports, and
-`noEmit: true` because emitting is `build.ts`'s job — `tsc` here is a checker only.
-
-Read the last two lines together, though: `include` covers `src/**/*.ts`, but `exclude`
-then removes `src/**/*.test.ts`. **Test files are never type-checked.** Biome lints them,
-and `bun test` transpiles rather than checks them, so a type error in a test cannot fail
-`check`, `build`, or CI. This is filed as a finding below.
-
-`biome.json` sets the lint and format surface:
-
-```bash
-sed -n '8,18p' biome.json
-```
-
-```output
-  "files": {
-    "includes": [
-      "src/**/*.ts",
-      "src/**/*.js",
-      "*.json",
-      "scripts/**/*.ts",
-      "version-bump.ts",
-      "build.ts"
-    ],
-    "ignoreUnknown": true
-  },
-```
-
-This is an allowlist, not a denylist, and that is what keeps the minified `main.js` out of
-the linter: the only `.js` glob is `src/**/*.js`, and `main.js` sits at the repository root.
-Nothing here matches it. (`vcs.useIgnoreFile: true` in the block above does make Biome
-honour `.gitignore` — that is what excludes `node_modules/` — but it could not exclude
-`main.js` in any case, because `main.js` is tracked and deliberately not gitignored.)
-
-Counting the matches confirms the surface is exactly eleven files: four under `src/`,
-`build.ts` and `version-bump.ts`, and the five root-level JSON files. Note also that
-`"scripts/**/*.ts"` matches nothing — there is no `scripts/` directory — which is filed
-below.
+`main.js`, `manifest.json` and, if present, `styles.css` are the three files Obsidian loads
+from a plugin folder. The template has no `styles.css`, but the ribbon icon's
+`my-plugin-ribbon-class` is the hook for one. A plugin that adds a stylesheet ships it with
+no edit to this workflow.
 
 ## 10. Following the whole chain once
 
-Putting the pieces in execution order:
-
 1. You edit `src/main.ts` or a module it imports.
-2. `bun run build` runs `check` (tsc + Biome), then `build.ts` bundles `src/main.ts` into
-   `main.js` as minified CommonJS with `obsidian` and `electron` left external.
-3. You commit **both** the source and the rebuilt `main.js`.
-4. CI re-runs the build and `git diff --exit-code main.js`, failing the PR if you skipped
-   step 3. Then `bun test` runs the pure-module tests through the `obsidian` preload stub.
-5. `bun run version` (after bumping `package.json`) propagates the version into
-   `manifest.json` and appends it to `versions.json`.
-6. Pushing a tag fires `release.yml`, which builds and publishes `main.js` +
-   `manifest.json` as a GitHub release.
-7. Obsidian downloads those two files into `.obsidian/plugins/<id>/` and calls `onload()`.
-
-The chain reads cleanly in one direction with one exception, noted in the findings: step 6's
-upload list and step 2's build config both have to know about any third file the plugin
-ships, and nothing connects them.
-
-Step 2 also has a hole worth knowing before you rely on it: `bun run dev` does **not**
-actually watch. That is a separate finding from a later audit pass, filed as
-`dev-script-does-not-watch`.
+2. `bun run build` runs `check` (tsc, Biome, prettier), then bundles `src/main.ts` into a
+   minified CommonJS `main.js` with `obsidian` and `electron` left external.
+3. You commit the source **and** the rebuilt `main.js` together.
+4. CI rebuilds and diffs `main.js`, then runs the tests through the `obsidian` stub. On a
+   Dependabot PR, the `rebuild` job does step 3 for you.
+5. A release bumps `package.json`, runs `bun run version` to sync `manifest.json` and append
+   to `versions.json`, and merges as one prep PR.
+6. A bare-semver tag on the merged commit fires `release.yml`. It verifies the tag against
+   all three files and the bundle against a fresh build, then publishes the assets.
+7. Obsidian downloads those files into `.obsidian/plugins/<id>/`, constructs `ExamplePlugin`
+   and calls `onload()`. The settings tab reads its keychain names through `secretStatus`,
+   and the plugin reads the credential's value with `secretStorage.getSecret(id)` only when
+   it needs it.
 
 ## Findings
 
-Tracing the code end to end surfaced two things a reader of this walkthrough should not have
-to rediscover. Both are filed in `.issues/`.
+This pass regenerated the walkthrough rather than extending it. The previous version
+described the code before the 1.1.0 changes. It had a `build.ts` that was removed in #72, a
+settings tab with an empty `display()` that #82 replaced, a `tsconfig.json` test exclusion
+and a Biome file allowlist that are both gone, and a release workflow with a hard-coded two-file
+upload list and no tag check, which #73 replaced. Each was corrected in place.
 
-**Related existing findings.** This walkthrough was produced as the second of several review
-passes over the same repository, and the others' findings are not counted below:
+Its two filed findings are resolved in the code: the duplicated shipped-file list (issue #51,
+now the optional `styles.css` step in section 9) and the undemonstrated settings tab
+(issue #61, now section 4).
 
-- A `code-theory` pass (see `THEORY.md`) filed five: two release-procedure contradictions
-  (`CLAUDE.md` names skills that do not exist; `README.md` still demonstrates the
-  hand-tagging `CLAUDE.md` forbids), the `tsconfig.json` test-exclusion described in
-  section 9, the dead `scripts/**/*.ts` Biome glob also in section 9, and a changelog entry
-  that contradicts the committed-`main.js` design in section 6.
-- A later `code-audit` pass (see `.issues/000-audit.md`) filed four, including the
-  `bun run dev` regression noted in section 10.
+Tracing the code surfaced one new finding, filed locally for follow-up after this release:
 
-The previous `WALKTHROUGH.md` was stale — it described a `src/main.test.ts` that does not
-exist under that name and omitted `src/test-preload.ts` entirely, both consequences of the
-test restructuring in commits `d32a6aa` and `f2bc2af`. It was regenerated rather than filed.
+| #   | Severity | Issue                                                                                        | Primary location                           |
+| --- | -------- | -------------------------------------------------------------------------------------------- | ------------------------------------------ |
+| 1   | low      | The `Name` validator's comment calls for a load-time check that `loadSettings` does not make | `src/main.ts` — `loadSettings`, `Name` row |
 
-### Index
-
-| #   | Severity | Issue                                                       | Primary location                      |
-| --- | -------- | ----------------------------------------------------------- | ------------------------------------- |
-| 1   | medium   | `shipped-file-list-is-duplicated-between-build-and-release` | `release.yml:28-31`, `src/main.ts:33` |
-| 2   | low      | `settings-tab-is-registered-but-demonstrates-nothing`       | `src/main.ts:35,47-58`                |
-
-**Total: 2 issues (0 critical, 0 high, 1 medium, 1 low)**
+**Total: 1 issue (0 critical, 0 high, 0 medium, 1 low)**
