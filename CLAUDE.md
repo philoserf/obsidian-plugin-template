@@ -86,5 +86,6 @@ result to match the committed `main.js`, runs the tests, and uploads `main.js`,
 
 ## Code Style
 
-`biome.json`'s `files.includes` and `tsconfig.json`'s `include` are both explicit lists, so a
-new top-level `.ts` file is neither linted nor typechecked until it is added to both.
+Biome checks every file git does not ignore, except the minified `main.js`
+(`"includes": ["**", "!main.js"]`). `tsconfig.json`'s `include` is still an explicit list, so a
+new top-level `.ts` file is linted but not typechecked until it is added there.
