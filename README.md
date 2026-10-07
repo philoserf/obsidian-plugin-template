@@ -8,15 +8,15 @@ Minimal template for Obsidian plugins using Bun.
 
 Copy the repository, then change each of these. The check at the end finds any you missed.
 
-| File                                  | What                                                           | Change to                                                                                              |
-| ------------------------------------- | -------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------ |
-| `manifest.json`                       | `id` (`your-plugin-id`)                                        | your plugin's id, which is also its folder name under `.obsidian/plugins/`                             |
-| `manifest.json`                       | `name`, `description`                                          | the display name and one sentence                                                                      |
-| `package.json`                        | `name` (`obsidian-plugin-template`), `description`             | your repository name and the manifest's sentence                                                       |
-| `package.json`                        | the `deploy` script                                            | a copy of `main.js` and `manifest.json` into your vault's plugin folder                                |
-| `src/main.ts`, `src/settings.test.ts` | `ExamplePlugin`, `ExampleSettingTab`, `my-plugin-ribbon-class` | your own class names and CSS class                                                                     |
-| `CHANGELOG.md`, `versions.json`       | the template's own history                                     | start your own; `versions.json` can begin as `{}`, and `bun run version` appends to it                 |
-| `THEORY.md`, `WALKTHROUGH.md`         | documents about the template, not your plugin                  | delete them, or regenerate them against your code with the `code-theory` and `code-walkthrough` skills |
+| File                                  | What                                                                                  | Change to                                                                                              |
+| ------------------------------------- | ------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------ |
+| `manifest.json`                       | `id` (`your-plugin-id`)                                                               | your plugin's id, which is also its folder name under `.obsidian/plugins/`                             |
+| `manifest.json`                       | `name`, `description`                                                                 | the display name and one sentence                                                                      |
+| `package.json`                        | `name` (`obsidian-plugin-template`), `description`                                    | your repository name and the manifest's sentence                                                       |
+| `package.json`                        | the `deploy` script                                                                   | a copy of `main.js` and `manifest.json` into your vault's plugin folder                                |
+| `src/main.ts`, `src/settings.test.ts` | `ExamplePlugin`, `ExampleSettingTab`, `my-plugin-ribbon-class`, `your-plugin-api-key` | your own class names, CSS class and suggested secret name                                              |
+| `CHANGELOG.md`, `versions.json`       | the template's own history                                                            | start your own; `versions.json` can begin as `{}`, and `bun run version` appends to it                 |
+| `THEORY.md`, `WALKTHROUGH.md`         | documents about the template, not your plugin                                         | delete them, or regenerate them against your code with the `code-theory` and `code-walkthrough` skills |
 
 `author` and `authorUrl` in `manifest.json`, `author` in `package.json`, and the `LICENSE` copyright are the template owner's. Change them if that is not you.
 

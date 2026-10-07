@@ -64,6 +64,26 @@ export default class ExamplePlugin extends Plugin {
   }
 }
 
+/**
+ * What a secret row says about the secret it points at. The plugin row and
+ * Settings → Keychain are separate screens, and a secret's name syncs with
+ * data.json while its value stays on the device that stored it — so on a
+ * second device the row holds a name that keychain lacks, and nothing else
+ * says what to call the secret. Reads names only, never values.
+ */
+export function secretStatus(
+  id: string,
+  onDevice: readonly string[],
+  suggested: string,
+): string {
+  if (!id) {
+    return `Choose or create a keychain secret. Naming it "${suggested}" lets other plugins use the same one.`;
+  }
+  return onDevice.includes(id)
+    ? `Uses the keychain secret "${id}".`
+    : `This device's keychain has no secret named "${id}". Add it in Settings → Keychain under that name, or choose another secret here.`;
+}
+
 // Declarative settings (Obsidian 1.13.0): the tab is data. Obsidian renders
 // it, indexes every row for settings search, and saves each `control` row to
 // plugin.settings[key] itself. A `render` row is drawn by hand and saves
@@ -121,7 +141,11 @@ export class ExampleSettingTab extends PluginSettingTab {
         items: [
           {
             name: "API key",
-            desc: "Kept in Obsidian's secret storage; only its ID is saved.",
+            desc: secretStatus(
+              this.plugin.settings.apiKeySecret,
+              this.app.secretStorage.listSecrets(),
+              "your-plugin-api-key",
+            ),
             // There is no declarative secret control, so this row is
             // rendered by hand, and saves by hand.
             render: (setting) => {
@@ -130,6 +154,8 @@ export class ExampleSettingTab extends PluginSettingTab {
                 .onChange(async (id) => {
                   this.plugin.settings.apiKeySecret = id;
                   await this.plugin.saveSettings();
+                  // Re-render so the description reports the new secret.
+                  this.update();
                 });
             },
           },
