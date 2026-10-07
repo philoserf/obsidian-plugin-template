@@ -5,14 +5,16 @@ import type {
   SettingDefinitionItem,
 } from "obsidian";
 import type ExamplePlugin from "./main";
-import { ExampleSettingTab } from "./main";
+import { ExampleSettingTab, secretStatus } from "./main";
 
 // The tab is data, so it is tested as data: no DOM and no Obsidian. The
 // plugin is a stand-in; Obsidian runs the real lifecycle.
 function definitions(): SettingDefinitionItem[] {
   const plugin = { settings: {}, greet() {} } as unknown as ExamplePlugin;
   return new ExampleSettingTab(
-    {} as ExamplePlugin["app"],
+    {
+      secretStorage: { listSecrets: () => [] },
+    } as unknown as ExamplePlugin["app"],
     plugin,
   ).getSettingDefinitions();
 }
@@ -65,4 +67,20 @@ test("keeps the API key out of the auto-saved controls", () => {
   const r = row("API key");
   expect("render" in r).toBe(true);
   expect("control" in r).toBe(false);
+});
+
+// The row and Settings → Keychain are separate screens, and only the secret's
+// name syncs — so the row has to say what the secret is called.
+test("a secret row suggests a name when none is chosen", () => {
+  expect(secretStatus("", [], "your-plugin-api-key")).toContain(
+    '"your-plugin-api-key"',
+  );
+});
+
+test("a secret row names the secret this device has", () => {
+  expect(secretStatus("k", ["k"], "s")).toBe('Uses the keychain secret "k".');
+});
+
+test("a secret row says what to add when this device lacks it", () => {
+  expect(secretStatus("k", [], "s")).toContain('no secret named "k"');
 });
