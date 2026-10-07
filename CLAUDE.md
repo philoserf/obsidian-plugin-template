@@ -6,8 +6,14 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 Minimal template for Obsidian plugins using Bun as the build tool and runtime. The real
 consumers are the repositories copied from it, so a change is good if it improves every
-future copy — the placeholder ids, `greet()`, the ribbon icon and the empty settings tab are
+future copy — the placeholder ids, `greet()`, the ribbon icon and the example settings tab are
 demonstration surface, not dead code.
+
+The settings tab is the pattern the philoserf plugins port to: declarative
+`getSettingDefinitions()` (Obsidian 1.13.0, hence `minAppVersion`), one row of each common
+kind, and a `render` row with a `SecretComponent` for credentials, which store only a secret
+ID in `data.json`. There is no `display()`; it is deprecated and never called once
+definitions are returned.
 
 The current next step for this repo is tracked in the workspace backlog at `../NEXT.md` (the
 `obsidian-plugin-template` row). Read it when starting work; update it when that step ships.
@@ -65,6 +71,9 @@ Plugin lifecycle is exercised by Obsidian itself — never instantiate the `Plug
 tests. Test pure modules imported by `main.ts` (see `src/utils.ts` / `src/utils.test.ts` for
 the pattern). `bunfig.toml` preloads `src/test-preload.ts`, which `mock.module`s `obsidian` so
 a pure module that happens to sit beside an `obsidian` import still loads under `bun test`.
+The settings tab is the one class tested directly: its definitions are data, so
+`src/settings.test.ts` asserts on `getSettingDefinitions()` with a stand-in plugin and no DOM.
+A new `obsidian` value import needs a stub in the preload.
 Test files are typechecked by `bun run check` along with the rest of `src/`.
 
 ### Release

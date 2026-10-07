@@ -9,3 +9,7 @@ test("greet function returns a greeting", () => {
 test("greet function handles empty string", () => {
   expect(greet("")).toBe("Hello, !");
 });
+
+test("greet function uses the given greeting", () => {
+  expect(greet("World", "Welcome")).toBe("Welcome, World!");
+});

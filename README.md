@@ -12,6 +12,10 @@ bun install
 
 Update `manifest.json` with your plugin details.
 
+Targets Obsidian 1.13.0 (`minAppVersion`): the settings tab uses declarative
+`getSettingDefinitions()`, and credentials go in Obsidian's secret storage through
+`SecretComponent`, never in `data.json`.
+
 ## Development
 
 ```bash
