@@ -6,15 +6,11 @@
   "author": "Mark Ayers",
   "license": "MIT",
   "scripts": {
-    "audit": "bun audit --audit-level=critical",
     "dev": "bun build src/main.ts --outdir . --format cjs --external obsidian --external electron --watch",
     "build": "bun run check && bun build src/main.ts --outdir . --format cjs --external obsidian --external electron --minify",
     "check": "bun run typecheck && biome check .",
     "typecheck": "tsc --noEmit",
-    "lint": "biome check .",
     "lint:fix": "biome check --write .",
-    "format": "biome format --write .",
-    "format:check": "biome format .",
     "version": "bun run version-bump.ts",
     "test": "bun test",
     "deploy": "echo 'Update this path: cp main.js manifest.json ~/path/to/vault/.obsidian/plugins/your-plugin/'"
