@@ -45,11 +45,10 @@ in the order they bite:
 
 - `main.js` is tracked on purpose. Gitignoring it has been tried and reverted; do not "fix"
   it again.
-- Every source change must be committed together with a rebuilt `main.js`. CI
-  (`.github/workflows/main.yml`) runs `bun run build` then `git diff --exit-code main.js`, so
-  a stale bundle fails the PR.
-- Bun is deliberately unpinned (`bun-version: latest` in the CI and release workflows), so a
-  Bun release that shifts bundler output trips the same diff. The remedy is always rebuild
+- Every source change must be committed together with a rebuilt `main.js`. Nothing automated
+  checks it: after `bun run build`, `git diff --exit-code main.js` should be clean.
+- Bun is deliberately unpinned, so a Bun release that shifts bundler output moves `main.js`
+  too. The remedy is always rebuild
   and commit — never pin Bun to silence it.
 - The `build` and `dev` scripts call `bun build` directly — there is no build script file.
   They externalize `obsidian` and `electron` and emit CommonJS. Bundling either
@@ -61,9 +60,8 @@ in the order they bite:
 (`version-bump.ts`) is the only writer of `manifest.json` and `versions.json`.
 `versions.json` is not a changelog — it maps each plugin version to the `minAppVersion` that
 build requires, and Obsidian reads it to serve older builds to older apps. It is append-only;
-pruning it strands users. The release workflow refuses a tag that disagrees with
-`package.json`, `manifest.json` or `versions.json`, so a skipped `bun run version` fails the
-release rather than shipping a mislabelled manifest.
+pruning it strands users. A release tag must agree with `package.json`, `manifest.json` and
+`versions.json`; a skipped `bun run version` ships a mislabelled manifest.
 
 ### Testing
 
@@ -78,10 +76,8 @@ Test files are typechecked by `bun run check` along with the rest of `src/`.
 
 ### Release
 
-Use the `release-gate` then `release-ship` skills — do not tag by hand.
-`.github/workflows/release.yml` fires only on bare-semver tags (`1.2.3`; Obsidian convention
-is no `v` prefix), checks the tag against the three version files, rebuilds and requires the
-result to match the committed `main.js`, runs the tests, and uploads `main.js`,
+Use the `release-gate` then `release-ship` skills — do not tag by hand. Tags are bare semver
+(`1.2.3`; Obsidian convention is no `v` prefix), and a release carries `main.js`,
 `manifest.json` and — if the plugin has one — `styles.css`.
 
 ## Code Style
