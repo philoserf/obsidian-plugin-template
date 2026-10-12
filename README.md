@@ -49,7 +49,7 @@ bun run check  # Type check, lint, and format check
 
 ## Release
 
-Use the `release-gate` then `release-ship` skills, as `CLAUDE.md` says; do not tag by hand. The release workflow runs on a bare-semver tag (`1.2.3`) and refuses one that disagrees with `package.json`, `manifest.json` or `versions.json`.
+Use the `release-gate` then `release-ship` skills, as `CLAUDE.md` says; do not tag by hand. Tags are bare semver (`1.2.3`) and must agree with `package.json`, `manifest.json` and `versions.json`.
 
 ## License
 
