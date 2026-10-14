@@ -152,7 +152,8 @@ export class ExampleSettingTab extends PluginSettingTab {
               new SecretComponent(this.app, setting.controlEl)
                 .setValue(this.plugin.settings.apiKeySecret)
                 .onChange(async (id) => {
-                  this.plugin.settings.apiKeySecret = id;
+                  // A cleared control reports null.
+                  this.plugin.settings.apiKeySecret = id ?? "";
                   await this.plugin.saveSettings();
                   // Re-render so the description reports the new secret.
                   this.update();
