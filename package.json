@@ -9,7 +9,7 @@
     "dev": "bun build src/main.ts --outdir . --format cjs --external obsidian --external electron --watch",
     "build": "bun run check && bun build src/main.ts --outdir . --format cjs --external obsidian --external electron --minify",
     "check": "bun run typecheck && biome check . && prettier --check \"**/*.md\"",
-    "typecheck": "tsc --noEmit",
+    "typecheck": "bun --check",
     "lint:fix": "biome check --write . && prettier --write \"**/*.md\"",
     "version": "bun run version-bump.ts",
     "test": "bun test",
