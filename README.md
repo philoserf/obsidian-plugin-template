@@ -17,6 +17,7 @@ Copy the repository, then change each of these. The check at the end finds any y
 | `src/main.ts`, `src/settings.test.ts` | `ExamplePlugin`, `ExampleSettingTab`, `my-plugin-ribbon-class`, `your-plugin-api-key` | your own class names, CSS class and suggested secret name                                              |
 | `CHANGELOG.md`, `versions.json`       | the template's own history                                                            | start your own; `versions.json` can begin as `{}`, and `bun run version` appends to it                 |
 | `THEORY.md`, `WALKTHROUGH.md`         | documents about the template, not your plugin                                         | delete them, or regenerate them against your code with the `code-theory` and `code-walkthrough` skills |
+| `CLAUDE.md`                           | the Project Overview and its `obsidian-plugin-template` backlog pointer               | a description of your plugin; keep the rest, which applies to any copy                                 |
 
 `author` and `authorUrl` in `manifest.json`, `author` in `package.json`, and the `LICENSE` copyright are the template owner's. Change them if that is not you.
 
