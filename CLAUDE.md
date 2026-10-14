@@ -25,7 +25,7 @@ The current next step for this repo is tracked in the workspace backlog at `../N
 ```bash
 bun run build                    # Runs check, then bundles to ./main.js (minified)
 bun run dev                      # Unminified build, rebuilt on every change (watch mode)
-bun run check                    # tsc --noEmit, biome check ., then prettier --check on Markdown
+bun run check                    # bun --check, biome check ., then prettier --check on Markdown
 bun run lint:fix                 # Auto-fix lint and format issues (Biome and prettier)
 bun run version                  # Sync package.json version into manifest.json + versions.json
 bun test src/utils.test.ts       # Run one test file
@@ -34,6 +34,9 @@ bun test -t "empty string"       # Run tests matching a name
 
 `build` and `dev` both overwrite the tracked `main.js`. `dev` writes an _unminified_ bundle,
 so after using it run `bun run build` before committing or the CI diff fails.
+
+The `typecheck` script is `bun --check`, not `bun check`: with a `check` script in
+`package.json`, bare `bun check` runs that script, which calls `typecheck`, so it loops.
 
 ## Architecture
 
