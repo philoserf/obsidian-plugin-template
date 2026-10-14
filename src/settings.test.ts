@@ -5,7 +5,7 @@ import type {
   SettingDefinitionItem,
 } from "obsidian";
 import type ExamplePlugin from "./main";
-import { ExampleSettingTab, secretStatus } from "./main";
+import { ExampleSettingTab, secretStatus, settingsFrom } from "./main";
 
 // The tab is data, so it is tested as data: no DOM and no Obsidian. The
 // plugin is a stand-in; Obsidian runs the real lifecycle.
@@ -55,6 +55,19 @@ test("rejects an empty name and accepts any other", async () => {
   const validate = r.control.validate;
   expect(await validate?.("  ")).toBe("Name cannot be empty.");
   expect(await validate?.("Ada")).toBeUndefined();
+});
+
+// validate never repairs data.json, so loading checks the same rule again.
+test("loading replaces a stored blank name with the default", () => {
+  expect(settingsFrom({ name: "  " }).name).toBe("Obsidian User");
+});
+
+test("loading keeps a stored name and fills in missing settings", () => {
+  expect(settingsFrom({ name: "Ada" })).toMatchObject({
+    name: "Ada",
+    greeting: "Hello",
+  });
+  expect(settingsFrom(null).name).toBe("Obsidian User");
 });
 
 test("offers an action row", () => {

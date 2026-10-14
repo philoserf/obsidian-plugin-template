@@ -24,6 +24,19 @@ const DEFAULT_SETTINGS: PluginSettings = {
   apiKeySecret: "",
 };
 
+/**
+ * The settings as stored, with the tab's invariants applied again. A row's
+ * `validate` only rejects an edit in the UI; data.json can still hold a blank
+ * name from a hand edit, a sync conflict or an older version.
+ */
+export function settingsFrom(
+  stored: Partial<PluginSettings> | null,
+): PluginSettings {
+  const settings = Object.assign({}, DEFAULT_SETTINGS, stored);
+  if (settings.name.trim() === "") settings.name = DEFAULT_SETTINGS.name;
+  return settings;
+}
+
 export default class ExamplePlugin extends Plugin {
   override settings: PluginSettings = DEFAULT_SETTINGS;
 
@@ -56,7 +69,7 @@ export default class ExamplePlugin extends Plugin {
   }
 
   async loadSettings(): Promise<void> {
-    this.settings = Object.assign({}, DEFAULT_SETTINGS, await this.loadData());
+    this.settings = settingsFrom(await this.loadData());
   }
 
   async saveSettings(): Promise<void> {
@@ -111,7 +124,8 @@ export class ExampleSettingTab extends PluginSettingTab {
               key: "name",
               placeholder: DEFAULT_SETTINGS.name,
               // Rejects the edit in the UI only. A stored value is never
-              // repaired, so anything that must hold is checked on load too.
+              // repaired, so anything that must hold is checked on load too,
+              // in settingsFrom.
               validate: (value) =>
                 value.trim() === "" ? "Name cannot be empty." : undefined,
             },
