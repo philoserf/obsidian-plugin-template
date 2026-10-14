@@ -33,7 +33,7 @@ bun test -t "empty string"       # Run tests matching a name
 ```
 
 `build` and `dev` both overwrite the tracked `main.js`. `dev` writes an _unminified_ bundle,
-so after using it run `bun run build` before committing or the CI diff fails.
+so after using it run `bun run build` before committing or `git diff --exit-code main.js` fails.
 
 The `typecheck` script is `bun --check`, not `bun check`: with a `check` script in
 `package.json`, bare `bun check` runs that script, which calls `typecheck`, so it loops.
