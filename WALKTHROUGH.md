@@ -5,7 +5,8 @@
 This repository is a **template** for building [Obsidian](https://obsidian.md) plugins with
 [Bun](https://bun.sh) as the bundler, script runner and test runner. Copying it gives you a working plugin
 with a command, a ribbon icon, a declarative settings tab with a keychain-backed credential
-row, a test harness, and a CI and release pipeline.
+row, and a test harness. Its release path runs through the `release-gate` and `release-ship`
+skills, not through anything in the repository.
 
 Most of what follows is a _worked example_, not a feature. `greet()`, `ExamplePlugin`, the
 example settings and the placeholder plugin id show where your own code goes. The settings
@@ -14,24 +15,23 @@ tab is also the pattern the philoserf plugins port to.
 One fact explains most of the repository's shape: **Obsidian does not build plugins.** It
 loads `manifest.json` and `main.js` straight out of a vault's `.obsidian/plugins/<id>/` folder
 and runs that JavaScript. Nothing gets installed or built on the user's machine. That is why
-the bundle is committed, why CI diffs it, and why the release workflow looks the way it does.
+the bundle is committed, why every change has to diff it, and why a release ships it as is.
 
 **Entry points**
 
-| Path              | Role                                                        |
-| ----------------- | ----------------------------------------------------------- |
-| `manifest.json`   | What Obsidian reads to identify and load the plugin         |
-| `src/main.ts`     | Plugin source entry, bundled into `main.js`                 |
-| `package.json`    | The `build`, `dev`, `check`, `version` and `test` scripts   |
-| `version-bump.ts` | Version sync, run only through `bun run version`            |
-| `.github/`        | CI (`main.yml`), release (`release.yml`), Dependabot config |
+| Path              | Role                                                      |
+| ----------------- | --------------------------------------------------------- |
+| `manifest.json`   | What Obsidian reads to identify and load the plugin       |
+| `src/main.ts`     | Plugin source entry, bundled into `main.js`               |
+| `package.json`    | The `build`, `dev`, `check`, `version` and `test` scripts |
+| `version-bump.ts` | Version sync, run only through `bun run version`          |
 
 ## Architecture
 
 ```text
 .
 ├── src/
-│   ├── main.ts           # Plugin class, secretStatus(), settings tab — the bundle entry
+│   ├── main.ts           # settingsFrom(), plugin class, secretStatus(), settings tab — the bundle entry
 │   ├── utils.ts          # greet(): a pure module with no obsidian import
 │   ├── utils.test.ts     # Tests for the pure module
 │   ├── settings.test.ts  # Tests the settings tab as data
@@ -43,12 +43,7 @@ the bundle is committed, why CI diffs it, and why the release workflow looks the
 ├── bunfig.toml           # Registers the test preload
 ├── tsconfig.json         # strict TypeScript, checker only
 ├── biome.json            # Lint + format for code and JSON
-├── .prettierrc.json      # Format for Markdown
-└── .github/
-    ├── dependabot.yml
-    └── workflows/
-        ├── main.yml      # CI: build, main.js diff gate, test; Dependabot rebuild
-        └── release.yml   # Bare-semver tag -> verified GitHub release
+└── .prettierrc.json      # Format for Markdown
 ```
 
 Data flows one way: `src/*.ts` → `bun build` → `main.js` → a GitHub release → a vault. At
@@ -153,7 +148,7 @@ same method:
   }
 
   async loadSettings(): Promise<void> {
-    this.settings = Object.assign({}, DEFAULT_SETTINGS, await this.loadData());
+    this.settings = settingsFrom(await this.loadData());
   }
 
   async saveSettings(): Promise<void> {
@@ -161,9 +156,26 @@ same method:
   }
 ```
 
-`loadSettings` merges the stored data over `DEFAULT_SETTINGS`, so a `data.json` written by an
-older version gets defaults for any keys it lacks. It does not check the stored values. See
-section 4 for what that means for the `Name` row.
+`loadSettings` hands whatever `loadData()` returns to `settingsFrom`, a pure function
+defined just above the class. `loadData()` returns `null` when no `data.json` exists yet:
+
+`src/main.ts` — `settingsFrom`
+
+```typescript
+export function settingsFrom(
+  stored: Partial<PluginSettings> | null,
+): PluginSettings {
+  const settings = Object.assign({}, DEFAULT_SETTINGS, stored);
+  if (settings.name.trim() === "") settings.name = DEFAULT_SETTINGS.name;
+  return settings;
+}
+```
+
+It merges the stored data over `DEFAULT_SETTINGS`, so a `data.json` written by an older
+version gets defaults for any keys it lacks, and a first run gets all defaults. Then it
+re-applies the one rule the settings tab enforces on input, a non-blank name. Section 4 shows
+that rule's other half. The repair happens in memory only. `data.json` keeps a blank name
+until the next save of any setting writes the repaired one back.
 
 ## 3. The pure layer: `src/utils.ts`
 
@@ -179,7 +191,9 @@ export function greet(name: string, greeting = "Hello"): string {
 ```
 
 That split is the template's testing strategy (section 6). Obsidian-facing code stays a thin
-registration layer, and the logic lives where `bun test` can reach it directly.
+registration layer, and the logic lives where `bun test` can reach it directly. `settingsFrom`
+and `secretStatus` are just as pure but sit in `main.ts`, beside what they serve. Tests reach
+them through the `obsidian` stub described in section 6.
 
 ## 4. The settings tab: definitions, not `display()`
 
@@ -226,17 +240,19 @@ The text row also carries a validator:
               key: "name",
               placeholder: DEFAULT_SETTINGS.name,
               // Rejects the edit in the UI only. A stored value is never
-              // repaired, so anything that must hold is checked on load too.
+              // repaired, so anything that must hold is checked on load too,
+              // in settingsFrom.
               validate: (value) =>
                 value.trim() === "" ? "Name cannot be empty." : undefined,
             },
 ```
 
 The comment matches Obsidian's own typings. `validate` runs when the row mounts and on each
-edit, and it never rewrites the stored value. An empty `name` that reaches `data.json` some
-other way, such as a hand edit, a sync conflict or an older version, survives `loadSettings`
-and greets as `Hello, !`. The template states the load-time rule here but does not
-demonstrate it in `loadSettings`, which this pass filed (see Findings).
+edit, and it never rewrites the stored value. An empty `name` can still reach `data.json`
+some other way, such as a hand edit, a sync conflict or an older version. Without a second
+check it would greet as `Hello, !`. `settingsFrom` (section 2) is that check, the same
+`trim() === ""` test applied on load. A row that gains a `validate` needs a matching line
+there.
 
 ### The credential row: `render`, `SecretComponent` and `secretStatus`
 
@@ -261,7 +277,8 @@ ID is written to settings, so the secret's value never touches `data.json`.
               new SecretComponent(this.app, setting.controlEl)
                 .setValue(this.plugin.settings.apiKeySecret)
                 .onChange(async (id) => {
-                  this.plugin.settings.apiKeySecret = id;
+                  // A cleared control reports null.
+                  this.plugin.settings.apiKeySecret = id ?? "";
                   await this.plugin.saveSettings();
                   // Re-render so the description reports the new secret.
                   this.update();
@@ -269,6 +286,11 @@ ID is written to settings, so the secret's value never touches `data.json`.
             },
           },
 ```
+
+Since `obsidian` 1.14.4 the typings declare `onChange`'s value as `string | null`, and a
+cleared control reports `null`. The row stores `""` instead, the value `DEFAULT_SETTINGS`
+already uses for "no secret". `apiKeySecret` stays a `string`, which is what `setValue` and
+`secretStatus` take.
 
 The row's description comes from `secretStatus`, a pure function that sits in `main.ts`
 next to the tab it serves. Its doc comment states the problem it solves. A secret's _name_
@@ -333,10 +355,21 @@ Read the flags against what Obsidian expects:
   time. Bundling either produces a _broken_ plugin, not just a large one.
 - `build` minifies; `dev` watches and stays unminified.
 
-`build` runs `check` first. That is `tsc --noEmit` (strict, with `noUncheckedIndexedAccess`
-and `exactOptionalPropertyTypes`), `biome check .` over everything git does not ignore
-except `main.js`, and prettier over Markdown. Test files are in `tsconfig.json`'s
-`src/**/*.ts` include, so they are typechecked too.
+`build` runs `check` first. That is `bun run typecheck`, `biome check .` over everything
+git does not ignore except `main.js`, and prettier over Markdown. Test files are in
+`tsconfig.json`'s `src/**/*.ts` include, so they are typechecked too.
+
+`package.json` — `scripts.typecheck`
+
+```json
+    "typecheck": "bun --check",
+```
+
+`bun --check` is Bun's built-in type checker. It reads `tsconfig.json` (strict, with
+`noUncheckedIndexedAccess` and `exactOptionalPropertyTypes`) and emits nothing. It is spelled
+as a flag on purpose. Bare `bun check` would run this repository's own `check` script, which
+calls `typecheck`, which would call `bun check` again. The `typescript` dev dependency is
+still installed for the editor's language server, and no script runs it.
 
 `dev` overwrites the tracked `main.js` with an unminified bundle. Run `bun run build` before
 committing.
@@ -406,65 +439,60 @@ function definitions(): SettingDefinitionItem[] {
 }
 ```
 
-The tests check four things: the group headings; which keys the control rows bind; the
+The tab tests check four things: the group headings; which keys the control rows bind; the
 `Name` validator; and that the API key row is a `render` row, not a `control`. That last one
 matters, because a `control` row would auto-save the value itself into `data.json`.
 `secretStatus` gets one test per outcome.
 
+The same file tests `settingsFrom`, the load-time half of the `Name` rule. It needs no stand-in
+at all, because it is `loadSettings` without the plugin:
+
+`src/settings.test.ts` — "loading replaces a stored blank name with the default"
+
+```typescript
+// validate never repairs data.json, so loading checks the same rule again.
+test("loading replaces a stored blank name with the default", () => {
+  expect(settingsFrom({ name: "  " }).name).toBe("Obsidian User");
+});
+```
+
+A second test checks that a real name survives, that missing keys get their defaults, and that
+`null`, a first run with no `data.json`, yields the defaults.
+
 Transcript of `bun test`, run while writing this document:
 
 ```text
-bun test v1.4.2 (43848b5a7)
+bun test v1.4.3 (26aa4e1a9)
 
- 11 pass
+ 13 pass
  0 fail
- 14 expect() calls
-Ran 11 tests across 2 files. [14.00ms]
+ 17 expect() calls
+Ran 13 tests across 2 files. [6.00ms]
 ```
 
-## 7. The committed bundle, and the CI gate that protects it
+## 7. The committed bundle, and the check that protects it
 
 `main.js` is a **tracked file**. It is the thing most likely to be "fixed" by someone
 applying general good practice. It was gitignored once (commit `673cbaa`) and restored
 (commit `3081162`), and issue #28 proposing the same change is closed.
 
-Because Obsidian ships the committed bundle, CI refuses a stale one:
+Because Obsidian ships the committed bundle, a stale one is a shipped bug. The check is two
+commands, run after any change to `src/` or to dependencies:
 
-`.github/workflows/main.yml` — `jobs.check`
-
-```yaml
-      - run: bun install --frozen-lockfile
-      - run: bun audit --audit-level=critical
-      # `build` is check + bundle. The diff then fails the PR when the committed
-      # main.js does not match a fresh build — Obsidian ships the committed
-      # bundle, so a dependency bump that skips the rebuild must not merge.
-      # bun is deliberately unpinned, so a bun release that shifts bundler
-      # output trips this too. The fix is the same either way: rebuild and
-      # commit main.js.
-      - run: bun run build
-      - run: git diff --exit-code main.js
-      - run: bun test
+```bash
+bun run build
+git diff --exit-code main.js
 ```
 
-Dependabot bumps `package.json` and `bun.lock` but never rebuilds, so every bump to a bundled
-dependency would fail that diff. The `rebuild` job handles that case. On a Dependabot pull
-request it builds, commits `main.js` onto the PR branch, and dispatches CI for the new head,
-because a push made with `GITHUB_TOKEN` starts no workflow but a dispatch does:
+If the diff is not clean, the rebuilt `main.js` belongs in the same commit as the change that
+moved it. Nothing in the repository runs this for you. Until #93 a CI workflow did, and until
+#92 a second job rebuilt `main.js` on Dependabot's pull requests. Both are gone, and
+dependency bumps are made by hand, so the rebuild is part of making one. The `release-gate`
+skill catches what slips through: it builds, and fails if the build leaves the tree dirty.
 
-`.github/workflows/main.yml` — `jobs.rebuild`, "Commit main.js and dispatch CI"
-
-```yaml
-        run: |
-          git diff --quiet main.js && exit 0
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git commit -m "chore: rebuild main.js for the dependencies bump" main.js
-          git push
-          gh workflow run main.yml --ref "$GITHUB_HEAD_REF"
-```
-
-A Bun release that shifts bundler output is deliberately not covered. Bun is unpinned on
-purpose, and the remedy there is a one-commit rebuild by hand, never a pin.
+Bun is unpinned on purpose. A Bun release that shifts bundler output shows up as a `main.js`
+diff the next time anyone builds, often inside an unrelated change. The remedy is the same:
+rebuild and commit, never pin.
 
 ## 8. Version identity: three files, one writer
 
@@ -508,75 +536,35 @@ apps:
 The `1.1.0` row is where the 1.13.0 floor from section 1 becomes visible to Obsidian. A user
 on 1.12 is offered `1.0.1`. The map is append-only, because pruning it strands those users.
 
-## 9. Release: `release.yml`
+## 9. Release: the `release-gate` and `release-ship` skills
 
-Only a bare-semver tag starts a release. In GitHub's filter syntax `+` is a quantifier, so
-`v1.2.3`, `1.2` and `1.2.3-beta` all fail to match:
+The repository has no release workflow. #93 removed it, and releases go through two skills,
+as `README.md` and `CLAUDE.md` both say: `release-gate` reports whether the tree can be
+tagged, and `release-ship` does the tagging. Neither lives in this repository.
 
-`.github/workflows/release.yml` — `on`
+The gate refuses what the old workflow refused, before anything is tagged. The version in
+`package.json` and `manifest.json` must match the release, and `versions.json` must have a
+row for it. A fresh build must leave `main.js` unchanged, and the tests must pass. Tags are
+bare semver (`1.2.3`, no `v`), which is Obsidian's convention.
 
-```yaml
-on:
-  push:
-    tags:
-      - "[0-9]+.[0-9]+.[0-9]+"
-```
-
-The job then refuses to publish anything the repository does not agree with. The tag must
-equal the version in `package.json` and `manifest.json` and have a row in `versions.json`. The
-fresh build must match the committed `main.js`. The tests must pass. Only then does it collect
-the assets:
-
-`.github/workflows/release.yml` — "Collect assets"
-
-```yaml
-          {
-            echo "files<<EOF"
-            echo main.js
-            echo manifest.json
-            if [ -f styles.css ]; then echo styles.css; fi
-            echo EOF
-          } >> "$GITHUB_OUTPUT"
-```
-
-`main.js`, `manifest.json` and, if present, `styles.css` are the three files Obsidian loads
-from a plugin folder. The template has no `styles.css`, but the ribbon icon's
-`my-plugin-ribbon-class` is the hook for one. A plugin that adds a stylesheet ships it with
-no edit to this workflow.
+`release-ship` creates the GitHub release with `gh release create` and attaches the assets
+the gate's Obsidian profile names: `main.js`, `manifest.json` and, if present, `styles.css`.
+Those are the three files Obsidian loads from a plugin folder. The template has no
+`styles.css`, but the ribbon icon's `my-plugin-ribbon-class` is the hook for one. A plugin
+that adds a stylesheet ships it with no edit here.
 
 ## 10. Following the whole chain once
 
 1. You edit `src/main.ts` or a module it imports.
-2. `bun run build` runs `check` (tsc, Biome, prettier), then bundles `src/main.ts` into a
-   minified CommonJS `main.js` with `obsidian` and `electron` left external.
-3. You commit the source **and** the rebuilt `main.js` together.
-4. CI rebuilds and diffs `main.js`, then runs the tests through the `obsidian` stub. On a
-   Dependabot PR, the `rebuild` job does step 3 for you.
-5. A release bumps `package.json`, runs `bun run version` to sync `manifest.json` and append
+2. `bun run build` runs `check` (`bun --check`, Biome, prettier), then bundles `src/main.ts`
+   into a minified CommonJS `main.js` with `obsidian` and `electron` left external.
+3. You confirm `git diff --exit-code main.js` shows only the change you meant, run
+   `bun test`, and commit the source **and** the rebuilt `main.js` together.
+4. A release bumps `package.json`, runs `bun run version` to sync `manifest.json` and append
    to `versions.json`, and merges as one prep PR.
-6. A bare-semver tag on the merged commit fires `release.yml`. It verifies the tag against
-   all three files and the bundle against a fresh build, then publishes the assets.
-7. Obsidian downloads those files into `.obsidian/plugins/<id>/`, constructs `ExamplePlugin`
-   and calls `onload()`. The settings tab reads its keychain names through `secretStatus`,
-   and the plugin reads the credential's value with `secretStorage.getSecret(id)` only when
-   it needs it.
-
-## Findings
-
-This pass regenerated the walkthrough rather than extending it. The previous version
-described the code before the 1.1.0 changes. It had a `build.ts` that was removed in #72, a
-settings tab with an empty `display()` that #82 replaced, a `tsconfig.json` test exclusion
-and a Biome file allowlist that are both gone, and a release workflow with a hard-coded two-file
-upload list and no tag check, which #73 replaced. Each was corrected in place.
-
-Its two filed findings are resolved in the code: the duplicated shipped-file list (issue #51,
-now the optional `styles.css` step in section 9) and the undemonstrated settings tab
-(issue #61, now section 4).
-
-Tracing the code surfaced one new finding, filed locally for follow-up after this release:
-
-| #   | Severity | Issue                                                                                        | Primary location                           |
-| --- | -------- | -------------------------------------------------------------------------------------------- | ------------------------------------------ |
-| 1   | low      | The `Name` validator's comment calls for a load-time check that `loadSettings` does not make | `src/main.ts` — `loadSettings`, `Name` row |
-
-**Total: 1 issue (0 critical, 0 high, 0 medium, 1 low)**
+5. `release-gate` checks the merged tree: versions agree, the build leaves `main.js` clean,
+   the tests pass. `release-ship` then tags the merged commit and publishes the assets.
+6. Obsidian downloads those files into `.obsidian/plugins/<id>/`, constructs `ExamplePlugin`
+   and calls `onload()`. `loadSettings` reads `data.json` through `settingsFrom`. The settings
+   tab reads its keychain names through `secretStatus`, and the plugin reads the credential's
+   value with `secretStorage.getSecret(id)` only when it needs it.

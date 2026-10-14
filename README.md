@@ -46,7 +46,7 @@ bun run build  # Production build
 bun run check  # Type check, lint, and format check
 ```
 
-**`main.js` is committed.** Obsidian loads the built bundle straight from the plugin folder, with no build step, so the committed `main.js` is the plugin. Commit every source change together with a rebuilt `main.js` (`bun run build`); CI rebuilds and fails the pull request when the committed bundle differs. Do not gitignore it.
+**`main.js` is committed.** Obsidian loads the built bundle straight from the plugin folder, with no build step, so the committed `main.js` is the plugin. Commit every source change together with a rebuilt `main.js` (`bun run build`), and check that `git diff --exit-code main.js` is clean before committing; nothing runs that check for you. Do not gitignore it.
 
 ## Release
 
