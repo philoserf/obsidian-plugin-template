@@ -1,5 +1,30 @@
 # Changelog
 
+## 1.1.1
+
+### Fixed
+
+- Store a cleared secret as `""` instead of `null`, which `SecretComponent` reports since `obsidian` 1.14.4
+- Fall back to the default name when `data.json` holds a blank one, the rule `validate` enforces in the UI
+- Turn off Biome 2.6's Markdown formatter, which disagreed with the Markdown formatter and failed `bun run check`
+
+### Changed
+
+- Type-check with `bun --check` instead of `tsc --noEmit`
+- Format Markdown with `bun fmt` instead of Prettier; `prettier` leaves `devDependencies`
+- Update dependencies
+
+### Removed
+
+- CI, check and release workflows; releases are cut locally
+- Dependabot
+
+### Documentation
+
+- Bring THEORY.md and WALKTHROUGH.md current after CI's removal
+- Name the `main.js` diff check in place of the removed CI
+- List CLAUDE.md in the README's copier checklist
+
 ## 1.1.0
 
 ### Added

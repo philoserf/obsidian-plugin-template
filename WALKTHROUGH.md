@@ -63,7 +63,7 @@ older than `minAppVersion`. `isDesktopOnly: false` declares mobile support.
 {
   "id": "your-plugin-id",
   "name": "Your Plugin Name",
-  "version": "1.1.0",
+  "version": "1.1.1",
   "minAppVersion": "1.13.0",
   "description": "A brief description of your plugin",
 ```
@@ -529,7 +529,8 @@ apps:
 {
   "1.0.0": "1.0.0",
   "1.0.1": "1.0.0",
-  "1.1.0": "1.13.0"
+  "1.1.0": "1.13.0",
+  "1.1.1": "1.13.0"
 }
 ```
 
