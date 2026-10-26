@@ -43,7 +43,7 @@ the bundle is committed, why every change has to diff it, and why a release ship
 ├── bunfig.toml           # Registers the test preload
 ├── tsconfig.json         # strict TypeScript, checker only
 ├── biome.json            # Lint + format for code and JSON
-└── .prettierrc.json      # Format for Markdown
+└── .prettierrc.json      # Markdown format config, read by bun fmt
 ```
 
 Data flows one way: `src/*.ts` → `bun build` → `main.js` → a GitHub release → a vault. At
@@ -343,7 +343,7 @@ No build script file exists. `package.json`'s scripts call `bun build` directly:
 ```json
     "dev": "bun build src/main.ts --outdir . --format cjs --external obsidian --external electron --watch",
     "build": "bun run check && bun build src/main.ts --outdir . --format cjs --external obsidian --external electron --minify",
-    "check": "bun run typecheck && biome check . && prettier --check \"**/*.md\"",
+    "check": "bun run typecheck && biome check . && bun fmt --check \"**/*.md\"",
 ```
 
 Read the flags against what Obsidian expects:
@@ -356,7 +356,7 @@ Read the flags against what Obsidian expects:
 - `build` minifies; `dev` watches and stays unminified.
 
 `build` runs `check` first. That is `bun run typecheck`, `biome check .` over everything
-git does not ignore except `main.js`, and prettier over Markdown. Test files are in
+git does not ignore except `main.js`, and `bun fmt` over Markdown. Test files are in
 `tsconfig.json`'s `src/**/*.ts` include, so they are typechecked too.
 
 `package.json` — `scripts.typecheck`
@@ -556,7 +556,7 @@ that adds a stylesheet ships it with no edit here.
 ## 10. Following the whole chain once
 
 1. You edit `src/main.ts` or a module it imports.
-2. `bun run build` runs `check` (`bun --check`, Biome, prettier), then bundles `src/main.ts`
+2. `bun run build` runs `check` (`bun --check`, Biome, `bun fmt`), then bundles `src/main.ts`
    into a minified CommonJS `main.js` with `obsidian` and `electron` left external.
 3. You confirm `git diff --exit-code main.js` shows only the change you meant, run
    `bun test`, and commit the source **and** the rebuilt `main.js` together.

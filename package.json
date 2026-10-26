@@ -8,9 +8,9 @@
   "scripts": {
     "dev": "bun build src/main.ts --outdir . --format cjs --external obsidian --external electron --watch",
     "build": "bun run check && bun build src/main.ts --outdir . --format cjs --external obsidian --external electron --minify",
-    "check": "bun run typecheck && biome check . && prettier --check \"**/*.md\"",
+    "check": "bun run typecheck && biome check . && bun fmt --check \"**/*.md\"",
     "typecheck": "bun --check",
-    "lint:fix": "biome check --write . && prettier --write \"**/*.md\"",
+    "lint:fix": "biome check --write . && bun fmt \"**/*.md\"",
     "version": "bun run version-bump.ts",
     "test": "bun test",
     "deploy": "echo 'Update this path: cp main.js manifest.json ~/path/to/vault/.obsidian/plugins/your-plugin/'"
@@ -19,7 +19,6 @@
     "@biomejs/biome": "^2.6.2",
     "@types/bun": "^1.4.4",
     "obsidian": "^1.14.4",
-    "prettier": "^3.9.10",
     "typescript": "^7.0.2"
   }
 }
