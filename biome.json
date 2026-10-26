@@ -9,6 +9,11 @@
   "formatter": {
     "indentStyle": "space"
   },
+  "markdown": {
+    "formatter": {
+      "enabled": false
+    }
+  },
   "assist": {
     "actions": {
       "source": {
