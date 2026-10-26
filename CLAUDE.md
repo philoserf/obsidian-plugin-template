@@ -89,5 +89,8 @@ Biome checks every file git does not ignore, except the minified `main.js`
 (`"includes": ["**", "!main.js"]`). `tsconfig.json`'s `include` is still an explicit list, so a
 new top-level `.ts` file is linted but not typechecked until it is added there.
 
+Biome 2.6 formats Markdown too; `biome.json` turns that off (`markdown.formatter.enabled:
+false`) because its list spacing disagrees with Prettier's, which left no Markdown passing both.
+
 Prettier owns Markdown only (`"**/*.md"` in the `check` and `lint:fix` scripts), with
 `proseWrap: preserve`; `.prettierignore` keeps it out of `main.js` and `.issues/`.
