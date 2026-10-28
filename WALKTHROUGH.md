@@ -15,7 +15,8 @@ tab is also the pattern the philoserf plugins port to.
 One fact explains most of the repository's shape: **Obsidian does not build plugins.** It
 loads `manifest.json` and `main.js` straight out of a vault's `.obsidian/plugins/<id>/` folder
 and runs that JavaScript. Nothing gets installed or built on the user's machine. That is why
-the bundle is committed, why every change has to diff it, and why a release ships it as is.
+the build ends by copying the bundle into a vault, and why a release attaches a fresh one.
+Nothing reads a committed copy, so `main.js` is gitignored.
 
 **Entry points**
 
@@ -24,6 +25,7 @@ the bundle is committed, why every change has to diff it, and why a release ship
 | `manifest.json`   | What Obsidian reads to identify and load the plugin       |
 | `src/main.ts`     | Plugin source entry, bundled into `main.js`               |
 | `package.json`    | The `build`, `dev`, `check`, `version` and `test` scripts |
+| `deploy.ts`       | The last step of `bun run build`: install into a vault    |
 | `version-bump.ts` | Version sync, run only through `bun run version`          |
 
 ## Architecture
@@ -36,8 +38,10 @@ the bundle is committed, why every change has to diff it, and why a release ship
 │   ├── utils.test.ts     # Tests for the pure module
 │   ├── settings.test.ts  # Tests the settings tab as data
 │   └── test-preload.ts   # Stubs the 'obsidian' module under bun test
+├── deploy.ts             # Copies the plugin into OBSIDIAN_DEPLOY_DEST, if set
 ├── version-bump.ts       # package.json version -> manifest.json + versions.json
-├── main.js               # Built bundle — COMMITTED, Obsidian loads this
+├── .env.local.example    # OBSIDIAN_DEPLOY_DEST, copied to the gitignored .env.local
+├── main.js               # Built bundle — gitignored, Obsidian loads this
 ├── manifest.json         # Obsidian plugin manifest
 ├── versions.json         # plugin version -> minimum Obsidian version
 ├── bunfig.toml           # Registers the test preload
@@ -46,7 +50,8 @@ the bundle is committed, why every change has to diff it, and why a release ship
 └── .prettierrc.json      # Markdown format config, read by bun fmt
 ```
 
-Data flows one way: `src/*.ts` → `bun build` → `main.js` → a GitHub release → a vault. At
+Data flows one way: `src/*.ts` → `bun build` → `main.js` → your vault (through `deploy.ts`)
+or a GitHub release → a vault. At
 runtime the plugin's only state is `data.json`, which it reads and writes through Obsidian's
 `loadData()`/`saveData()`. Credential values are the exception: they live in Obsidian's
 keychain, and `data.json` holds only a secret's name.
@@ -63,7 +68,7 @@ older than `minAppVersion`. `isDesktopOnly: false` declares mobile support.
 {
   "id": "your-plugin-id",
   "name": "Your Plugin Name",
-  "version": "1.1.1",
+  "version": "1.2.0",
   "minAppVersion": "1.13.0",
   "description": "A brief description of your plugin",
 ```
@@ -334,7 +339,7 @@ it.
 The control rows do not need this, because Obsidian saves them and their descriptions are
 static.
 
-## 5. The build: two `bun build` lines
+## 5. The build: two `bun build` lines and an install
 
 No build script file exists. `package.json`'s scripts call `bun build` directly:
 
@@ -342,7 +347,7 @@ No build script file exists. `package.json`'s scripts call `bun build` directly:
 
 ```json
     "dev": "bun build src/main.ts --outdir . --format cjs --external obsidian --external electron --watch",
-    "build": "bun run check && bun build src/main.ts --outdir . --format cjs --external obsidian --external electron --minify",
+    "build": "bun run check && bun build src/main.ts --outdir . --format cjs --external obsidian --external electron --minify && bun run deploy.ts",
     "check": "bun run typecheck && biome check . && bun fmt --check \"**/*.md\"",
 ```
 
@@ -353,7 +358,8 @@ Read the flags against what Obsidian expects:
 - `--format cjs`, because Obsidian's plugin loader evaluates CommonJS.
 - `--external obsidian --external electron`, because Obsidian supplies both modules at load
   time. Bundling either produces a _broken_ plugin, not just a large one.
-- `build` minifies; `dev` watches and stays unminified.
+- `build` minifies and then installs (section 7); `dev` watches, stays unminified and
+  installs nothing.
 
 `build` runs `check` first. That is `bun run typecheck`, `biome check .` over everything
 git does not ignore except `main.js`, and `bun fmt` over Markdown. Test files are in
@@ -371,8 +377,8 @@ as a flag on purpose. Bare `bun check` would run this repository's own `check` s
 calls `typecheck`, which would call `bun check` again. The `typescript` dev dependency is
 still installed for the editor's language server, and no script runs it.
 
-`dev` overwrites the tracked `main.js` with an unminified bundle. Run `bun run build` before
-committing.
+`dev` overwrites `./main.js` with an unminified bundle and does not copy it anywhere. Run
+`bun run build` to put a minified build into the vault.
 
 ## 6. Testing
 
@@ -462,37 +468,48 @@ A second test checks that a real name survives, that missing keys get their defa
 Transcript of `bun test`, run while writing this document:
 
 ```text
-bun test v1.4.3 (26aa4e1a9)
+bun test v1.4.4 (5d9cc0f4f)
 
  13 pass
  0 fail
  17 expect() calls
-Ran 13 tests across 2 files. [6.00ms]
+Ran 13 tests across 2 files. [4.00ms]
 ```
 
-## 7. The committed bundle, and the check that protects it
+## 7. The bundle is build output: `deploy.ts`
 
-`main.js` is a **tracked file**. It is the thing most likely to be "fixed" by someone
-applying general good practice. It was gitignored once (commit `673cbaa`) and restored
-(commit `3081162`), and issue #28 proposing the same change is closed.
+`main.js` is gitignored. It was tracked until 1.2.0 (#111): #28 had restored it for "users
+who install directly from GitHub", which none of the plugins copied from this template has.
+The vault gets its bundle from the build, and a release attaches a fresh one, so nothing
+reads a committed copy.
 
-Because Obsidian ships the committed bundle, a stale one is a shipped bug. The check is two
-commands, run after any change to `src/` or to dependencies:
+`bun run build` ends with `deploy.ts`, so building is installing:
 
-```bash
-bun run build
-git diff --exit-code main.js
+`deploy.ts`
+
+```typescript
+const dest = process.env.OBSIDIAN_DEPLOY_DEST;
+if (!dest) {
+  console.log("OBSIDIAN_DEPLOY_DEST not set — built ./main.js only");
+  process.exit(0);
+}
+
+const files = ["main.js", "manifest.json", "styles.css"].filter((f) =>
+  existsSync(f),
+);
+await $`mkdir -p ${dest}`;
+await $`cp ${files} ${dest}`;
 ```
 
-If the diff is not clean, the rebuilt `main.js` belongs in the same commit as the change that
-moved it. Nothing in the repository runs this for you. Until #93 a CI workflow did, and until
-#92 a second job rebuilt `main.js` on Dependabot's pull requests. Both are gone, and
-dependency bumps are made by hand, so the rebuild is part of making one. The `release-gate`
-skill catches what slips through: it builds, and fails if the build leaves the tree dirty.
+Bun loads `OBSIDIAN_DEPLOY_DEST` from the gitignored `.env.local`; `.env.local.example`
+shows the line to copy. `bun run` does not pass `.env.local` to a shell script, which is why
+the copy is a Bun file rather than a `cp` in `package.json`. Unset, as on a machine without
+the vault, the build stops at `./main.js`. The file list is the three Obsidian loads, with
+`styles.css` filtered out when the plugin has none.
 
-Bun is unpinned on purpose. A Bun release that shifts bundler output shows up as a `main.js`
-diff the next time anyone builds, often inside an unrelated change. The remedy is the same:
-rebuild and commit, never pin.
+Bun is unpinned on purpose. A Bun release that shifts bundler output changes the next build,
+and with `main.js` untracked there is no diff to commit; the next build carries it into the
+vault and the next release. Never pin Bun to silence a change in bundler output.
 
 ## 8. Version identity: three files, one writer
 
@@ -503,7 +520,7 @@ sets `npm_package_version`. Run any other way, the script throws:
 `version-bump.ts`
 
 ```typescript
-const targetVersion = Bun.env.npm_package_version;
+const targetVersion = process.env.npm_package_version;
 if (!targetVersion) {
   throw new Error("No version found in package.json");
 }
@@ -530,7 +547,8 @@ apps:
   "1.0.0": "1.0.0",
   "1.0.1": "1.0.0",
   "1.1.0": "1.13.0",
-  "1.1.1": "1.13.0"
+  "1.1.1": "1.13.0",
+  "1.2.0": "1.13.0"
 }
 ```
 
@@ -545,10 +563,12 @@ tagged, and `release-ship` does the tagging. Neither lives in this repository.
 
 The gate refuses what the old workflow refused, before anything is tagged. The version in
 `package.json` and `manifest.json` must match the release, and `versions.json` must have a
-row for it. A fresh build must leave `main.js` unchanged, and the tests must pass. Tags are
+row for it. A fresh build must leave the tree clean, and the tests must pass. Tags are
 bare semver (`1.2.3`, no `v`), which is Obsidian's convention.
 
-`release-ship` creates the GitHub release with `gh release create` and attaches the assets
+`release-ship` builds at the tag, because `main.js` is gitignored and the working tree's
+copy could come from any branch. It then creates the GitHub release with
+`gh release create` and attaches the assets
 the gate's Obsidian profile names: `main.js`, `manifest.json` and, if present, `styles.css`.
 Those are the three files Obsidian loads from a plugin folder. The template has no
 `styles.css`, but the ribbon icon's `my-plugin-ribbon-class` is the hook for one. A plugin
@@ -557,14 +577,16 @@ that adds a stylesheet ships it with no edit here.
 ## 10. Following the whole chain once
 
 1. You edit `src/main.ts` or a module it imports.
-2. `bun run build` runs `check` (`bun --check`, Biome, `bun fmt`), then bundles `src/main.ts`
-   into a minified CommonJS `main.js` with `obsidian` and `electron` left external.
-3. You confirm `git diff --exit-code main.js` shows only the change you meant, run
-   `bun test`, and commit the source **and** the rebuilt `main.js` together.
+2. `bun run build` runs `check` (`bun --check`, Biome, `bun fmt`), bundles `src/main.ts`
+   into a minified CommonJS `main.js` with `obsidian` and `electron` left external, and
+   `deploy.ts` copies it into your vault when `.env.local` names one.
+3. You reload the plugin in Obsidian, run `bun test`, and commit the source. `main.js` is
+   gitignored, so it is not part of the commit.
 4. A release bumps `package.json`, runs `bun run version` to sync `manifest.json` and append
    to `versions.json`, and merges as one prep PR.
-5. `release-gate` checks the merged tree: versions agree, the build leaves `main.js` clean,
-   the tests pass. `release-ship` then tags the merged commit and publishes the assets.
+5. `release-gate` checks the merged tree: versions agree, the build leaves the tree clean,
+   the tests pass. `release-ship` then tags the merged commit, builds at the tag and
+   publishes the assets.
 6. Obsidian downloads those files into `.obsidian/plugins/<id>/`, constructs `ExamplePlugin`
    and calls `onload()`. `loadSettings` reads `data.json` through `settingsFrom`. The settings
    tab reads its keychain names through `secretStatus`, and the plugin reads the credential's

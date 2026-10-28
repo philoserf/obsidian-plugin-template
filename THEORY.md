@@ -1,6 +1,6 @@
 # Theory
 
-_A Naur-style account of `obsidian-plugin-template` as of `1b724cd`, after 1.1.0: what you
+_A Naur-style account of `obsidian-plugin-template` as of `ba7b5b0`, before 1.2.0: what you
 need to hold in mind to change it without breaking the thing it exists to produce._
 
 ## What this repository is for
@@ -14,7 +14,7 @@ improves every future copy and every port, and bad if it only tidies this copy.
 
 New maintainers get this inversion wrong first. `greet()`, `ExamplePlugin`, `your-plugin-id`,
 the ribbon icon and its `my-plugin-ribbon-class`, the four example settings, the
-`your-plugin-api-key` suggestion and the `deploy` script that only echoes a path are not
+`your-plugin-api-key` suggestion and the empty `OBSIDIAN_DEPLOY_DEST` in `.env.local.example` are not
 dead code. They are the demonstration surface, and each is a filled-in example of one thing
 Obsidian lets a plugin do. Here the test for scaffolding is not "is it used?" but "would a
 copier be worse off without a worked example of it?" The README's "Make it yours" table and
@@ -29,23 +29,25 @@ Obsidian does not build plugins. It loads `manifest.json` and `main.js` from a v
 is. The user's machine has no install step and no dependency resolution. Most of the
 repository follows from that:
 
-- **The build output is the artifact, so it is committed.** `main.js` is tracked. It was
-  gitignored once (`673cbaa`) and restored (`3081162`), and issue #28 proposing the same is
-  closed. Of everything here, this is what general good practice most wants to "fix".
-- **A committed artifact can go stale, and the repository no longer refuses a stale one.**
-  The invariant is "the tree's `main.js` is what its source builds to". Until #93 two
-  workflows enforced it. Now nothing in the repository does. `CLAUDE.md` says so in as many
-  words, and the check is a habit: `bun run build`, then `git diff --exit-code main.js`. The
-  places it still bites are outside the repository: the gate a change is shipped under, and
-  `release-gate`'s check 16, which fails when a fresh build dirties the tree.
-- **Bun is unpinned on purpose, which pairs with the diff.** A Bun release that shifts
-  bundler output changes `main.js`. With CI gone, nobody hears about it until the next
-  person runs the build. That is usually inside an unrelated change, whose gate then fails
-  on a `main.js` diff that change did not cause. The remedy is still to rebuild and commit,
-  never to pin. Expect it to land in whatever PR comes next.
+- **The build output is the artifact, and it is built, not committed.** `main.js` is
+  gitignored since #111. The vault gets it from `bun run build`, whose last step, `deploy.ts`,
+  copies `main.js`, `manifest.json` and any `styles.css` to `OBSIDIAN_DEPLOY_DEST` from the
+  gitignored `.env.local`. A release attaches a fresh build. This reverses #28, which had
+  restored the tracked copy "for users who install directly from GitHub", and the old
+  `CLAUDE.md` rule against gitignoring it. No copy has such a user, and with CI gone (#93) the
+  tracked copy was a second artifact that could go stale with nothing to refuse it.
+- **Building is installing, so the build is environment-dependent by design.** With
+  `.env.local` naming a vault, `bun run build` writes into it; without one, it stops at
+  `./main.js`. The copy is a Bun file, not a `cp` in `package.json`, because `bun run` does
+  not hand `.env.local` to a shell script. A release does not use the vault copy:
+  `release-ship` builds at the tag, because a gitignored `main.js` is whatever the working
+  tree last built.
+- **Bun is unpinned on purpose.** A Bun release that shifts bundler output changes the next
+  build. Since `main.js` is untracked, that no longer surfaces as a stray diff in an
+  unrelated change; it goes straight into the vault and the next release. Never pin Bun to
+  silence it.
 - **Dependency bumps are by hand now, and some bumps break the check rather than the
-  bundle.** #92 removed Dependabot and its `rebuild` job. A bump to a bundled dependency
-  needs a rebuilt `main.js` in the same commit. A bump to a type-only dependency can fail
+  bundle.** #92 removed Dependabot and its `rebuild` job. A bump to a type-only dependency can fail
   `check` without changing a byte of output. #91 moved `obsidian` from 1.13.1 to 1.14.4,
   whose `SecretComponent.onChange` started reporting `string | null`, and `main` stopped
   typechecking until #96. The `obsidian` package is types only, since the app supplies the
@@ -61,7 +63,8 @@ repository follows from that:
 `package.json`, `manifest.json` and `versions.json` all carry version data, and they are not
 three copies of one fact. A human edits only `package.json`. `version-bump.ts`, run through
 `bun run version`, is the only writer of the other two. It overwrites the manifest's
-`version` and appends `versions[version] = minAppVersion`.
+`version` and appends `versions[version] = minAppVersion`, reading the version from
+`process.env.npm_package_version`, which `bun run` sets.
 
 `versions.json` is not a changelog. Obsidian uses it to serve an older build to an older app,
 which makes it append-only: pruning it strands users. `minAppVersion` has exactly one home,
@@ -75,7 +78,7 @@ Agreement between the three is checked at release, by `release-gate`'s version c
 reads all three and wants each to match the version under test. Since #93 there is no
 release workflow, so `release-ship` creates the GitHub release itself and attaches the assets
 the gate's Obsidian profile names: `main.js`, `manifest.json`, and `styles.css` when one
-exists. That list now lives in the skill, not in this repository. Adding a stylesheet still
+exists, building at the tag first. That list now lives in the skill, not in this repository. Adding a stylesheet still
 needs no edit here.
 
 ## Settings are data, and credentials are not settings
@@ -220,13 +223,15 @@ Adding a **credential** means copying the secret row: a `render` row with a
 description. Reading the value at use time goes through `app.secretStorage.getSecret(id)`, as
 the `PluginSettings` comment says.
 
-Adding a **stylesheet** is one file. `release-ship` attaches it when present.
+Adding a **stylesheet** is one file. `deploy.ts` installs it and `release-ship` attaches it
+when present.
 
 Adding a **top-level `.ts` file** is two edits. Biome lints it automatically, but
 `tsconfig.json`'s `include` is an explicit list, so it is not typechecked until added there.
 
-Changing the **build** is the highest-risk edit, because any bundler-output change is a
-repository-wide `main.js` diff. That cost is intended.
+Changing the **build** is the highest-risk edit, because a bundler-output change reaches the
+vault on the next build and users on the next release, with no committed diff to review.
+Test it in a vault before releasing.
 
 Moving below **Obsidian 1.13** would mean rethinking the settings tab and the credential
 model, not editing a number.
