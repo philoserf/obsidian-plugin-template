@@ -1,3 +1,7 @@
+# Build output. `bun run build` writes main.js here and copies it into the vault
+# (deploy.ts); a release attaches a fresh build. Nothing reads a committed copy.
+main.js
+
 # Dependencies
 node_modules/
 

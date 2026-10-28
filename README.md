@@ -13,7 +13,7 @@ Copy the repository, then change each of these. The check at the end finds any y
 | `manifest.json`                       | `id` (`your-plugin-id`)                                                               | your plugin's id, which is also its folder name under `.obsidian/plugins/`                             |
 | `manifest.json`                       | `name`, `description`                                                                 | the display name and one sentence                                                                      |
 | `package.json`                        | `name` (`obsidian-plugin-template`), `description`                                    | your repository name and the manifest's sentence                                                       |
-| `package.json`                        | the `deploy` script                                                                   | a copy of `main.js` and `manifest.json` into your vault's plugin folder                                |
+| `.env.local.example`                  | `OBSIDIAN_DEPLOY_DEST`                                                                | copy to `.env.local` with your vault's plugin folder, so `bun run build` installs into it              |
 | `src/main.ts`, `src/settings.test.ts` | `ExamplePlugin`, `ExampleSettingTab`, `my-plugin-ribbon-class`, `your-plugin-api-key` | your own class names, CSS class and suggested secret name                                              |
 | `CHANGELOG.md`, `versions.json`       | the template's own history                                                            | start your own; `versions.json` can begin as `{}`, and `bun run version` appends to it                 |
 | `THEORY.md`, `WALKTHROUGH.md`         | documents about the template, not your plugin                                         | delete them, or regenerate them against your code with the `code-theory` and `code-walkthrough` skills |
@@ -46,7 +46,7 @@ bun run build  # Production build
 bun run check  # Type check, lint, and format check
 ```
 
-**`main.js` is committed.** Obsidian loads the built bundle straight from the plugin folder, with no build step, so the committed `main.js` is the plugin. Commit every source change together with a rebuilt `main.js` (`bun run build`), and check that `git diff --exit-code main.js` is clean before committing; nothing runs that check for you. Do not gitignore it.
+**`bun run build` installs the plugin.** It ends with `deploy.ts`, which copies `main.js`, `manifest.json` and any `styles.css` into `OBSIDIAN_DEPLOY_DEST` from `.env.local`, so there is no separate deploy step; unset, the build stops at `./main.js`. `main.js` is gitignored build output: the vault gets it from the build, and a release attaches a fresh one.
 
 ## Release
 

@@ -7,13 +7,12 @@
   "license": "MIT",
   "scripts": {
     "dev": "bun build src/main.ts --outdir . --format cjs --external obsidian --external electron --watch",
-    "build": "bun run check && bun build src/main.ts --outdir . --format cjs --external obsidian --external electron --minify",
+    "build": "bun run check && bun build src/main.ts --outdir . --format cjs --external obsidian --external electron --minify && bun run deploy.ts",
     "check": "bun run typecheck && biome check . && bun fmt --check \"**/*.md\"",
     "typecheck": "bun --check",
     "lint:fix": "biome check --write . && bun fmt \"**/*.md\"",
     "version": "bun run version-bump.ts",
-    "test": "bun test",
-    "deploy": "echo 'Update this path: cp main.js manifest.json ~/path/to/vault/.obsidian/plugins/your-plugin/'"
+    "test": "bun test"
   },
   "devDependencies": {
     "@biomejs/biome": "^2.6.3",

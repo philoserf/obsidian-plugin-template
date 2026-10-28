@@ -1,4 +1,4 @@
-const targetVersion = Bun.env.npm_package_version;
+const targetVersion = process.env.npm_package_version;
 if (!targetVersion) {
   throw new Error("No version found in package.json");
 }

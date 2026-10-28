@@ -23,7 +23,7 @@ The current next step for this repo is tracked in the workspace backlog at `../N
 `bun run` prints the full script list. The ones with behavior worth knowing:
 
 ```bash
-bun run build                    # Runs check, then bundles to ./main.js (minified)
+bun run build                    # Runs check, bundles to ./main.js (minified), installs it (deploy.ts)
 bun run dev                      # Unminified build, rebuilt on every change (watch mode)
 bun run check                    # bun --check, biome check ., then bun fmt --check on Markdown
 bun run lint:fix                 # Auto-fix lint and format issues (Biome and bun fmt)
@@ -32,27 +32,27 @@ bun test src/utils.test.ts       # Run one test file
 bun test -t "empty string"       # Run tests matching a name
 ```
 
-`build` and `dev` both overwrite the tracked `main.js`. `dev` writes an _unminified_ bundle,
-so after using it run `bun run build` before committing or `git diff --exit-code main.js` fails.
+`dev` writes an _unminified_ bundle to `./main.js` and does not install it; `build` does both.
 
 The `typecheck` script is `bun --check`, not `bun check`: with a `check` script in
 `package.json`, bare `bun check` runs that script, which calls `typecheck`, so it loops.
 
 ## Architecture
 
-### The committed bundle
+### The bundle
 
 Obsidian has no build step: it loads `manifest.json` and `main.js` straight out of a vault's
-`.obsidian/plugins/<id>/`, so the committed `main.js` _is_ the shipped plugin. Consequences,
-in the order they bite:
+`.obsidian/plugins/<id>/`. Consequences, in the order they bite:
 
-- `main.js` is tracked on purpose. Gitignoring it has been tried and reverted; do not "fix"
-  it again.
-- Every source change must be committed together with a rebuilt `main.js`. Nothing automated
-  checks it: after `bun run build`, `git diff --exit-code main.js` should be clean.
-- Bun is deliberately unpinned, so a Bun release that shifts bundler output moves `main.js`
-  too. The remedy is always rebuild
-  and commit — never pin Bun to silence it.
+- `bun run build` ends with `deploy.ts`, which copies `main.js`, `manifest.json` and any
+  `styles.css` to `OBSIDIAN_DEPLOY_DEST`. Bun loads that from the gitignored `.env.local`
+  (see `.env.local.example`); `bun run` does not pass `.env.local` to a shell script, which
+  is why the copy is a Bun file and not a `cp` in `package.json`. Unset, the build stops at
+  `./main.js`.
+- `main.js` is gitignored. A release attaches a fresh build and the vault gets one from
+  `bun run build`, so nothing reads a committed copy. It was tracked until 2026-10-28: #28
+  restored it for "users who install directly from GitHub", which none of these plugins has.
+- Bun is deliberately unpinned; never pin it to silence a change in bundler output.
 - The `build` and `dev` scripts call `bun build` directly — there is no build script file.
   They externalize `obsidian` and `electron` and emit CommonJS. Bundling either
   module produces a broken plugin, not a large one.
