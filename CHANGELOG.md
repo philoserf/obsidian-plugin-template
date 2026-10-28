@@ -1,5 +1,26 @@
 # Changelog
 
+## 1.2.0
+
+### Added
+
+- `bun run build` installs the plugin: it ends with `deploy.ts`, which copies `main.js`, `manifest.json` and any `styles.css` to `OBSIDIAN_DEPLOY_DEST` from `.env.local`, and stops at `./main.js` when that is unset
+- `.env.local.example` showing `OBSIDIAN_DEPLOY_DEST`
+
+### Changed
+
+- `main.js` is gitignored and no longer tracked; a release attaches a fresh build. This reverses #28
+- `version-bump.ts` reads `process.env` instead of `Bun.env`
+- `deploy.ts` is typechecked, through `tsconfig.json`'s include list
+
+### Removed
+
+- The placeholder `deploy` script; the README's copier checklist points at `.env.local.example` instead
+
+### Documentation
+
+- Bring CLAUDE.md, README.md, THEORY.md and WALKTHROUGH.md current with the uncommitted bundle
+
 ## 1.1.1
 
 ### Fixed
