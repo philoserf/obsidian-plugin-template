@@ -15,9 +15,6 @@ kind, and a `render` row with a `SecretComponent` for credentials, which store o
 ID in `data.json`. There is no `display()`; it is deprecated and never called once
 definitions are returned.
 
-The current next step for this repo is tracked in the workspace backlog at `../NEXT.md` (the
-`obsidian-plugin-template` row). Read it when starting work; update it when that step ships.
-
 ## Development Commands
 
 `bun run` prints the full script list. The ones with behavior worth knowing:
