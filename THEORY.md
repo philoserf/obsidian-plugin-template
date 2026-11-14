@@ -265,8 +265,8 @@ These are inferences from the code and its history, not recovered intent.
   (`exactOptionalPropertyTypes`, `noUncheckedIndexedAccess`).
 - **`bunfig.toml`'s `[fmt]` ignore patterns list `main.js`**, though both `bun fmt` scripts
   glob only `**/*.md` and could never reach it. #84 removed "unreachable ignores" the same
-  day, just before #85 added the entry. I read this as protection for a hand-run `bun fmt .` or an editor
-  integration, not an oversight, but I am not certain.
+  day, just before #85 added the entry. I read this as protection for a hand-run
+  `bun fmt .` or an editor integration, not an oversight, but I am not certain.
 - **The method `ExamplePlugin.greet` and the imported function `greet` share a name.** Inside
   the method, `greet(...)` resolves to the module import, which is correct but reads like
   recursion. I cannot tell whether the shared name is a deliberate "the method is the

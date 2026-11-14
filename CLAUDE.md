@@ -92,5 +92,5 @@ both.
 
 `bun fmt` owns Markdown only (`"**/*.md"` in the `check` and `lint:fix` scripts), on its
 defaults, which preserve prose wrap; the `[fmt]` table in `bunfig.toml` keeps it out of
-`main.js`. Never add a `fmt` script to
-`package.json`: `bun fmt` would run that script instead of formatting.
+`main.js`. Never add a `fmt` script to `package.json`: `bun fmt` would run that script
+instead of formatting.
