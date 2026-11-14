@@ -205,7 +205,7 @@ across the plugins before. It is also now the whole procedure, since no workflow
 behind the skills to refuse what they would refuse.
 
 **Formatting.** Biome owns code and JSON, everything git does not ignore except `main.js`.
-`bun fmt` owns Markdown, reading `.prettierrc.json`, so prose wrap stays preserved. #85
+`bun fmt` owns Markdown, and its defaults preserve prose wrap. #85
 made Markdown formatting a repository rule rather than an editor habit, so `bun run check`,
 and therefore `build`, fails on unformatted Markdown. A docs-only change can fail the bundle
 build. That is surprising, and it is the price of one gate.
@@ -263,10 +263,10 @@ These are inferences from the code and its history, not recovered intent.
   this tree it agreed with `tsc` from TypeScript 7.0.2 (both clean) and failed `check` on a
   planted error. That is two observations, not a conformance record for this configuration
   (`exactOptionalPropertyTypes`, `noUncheckedIndexedAccess`).
-- **`.prettierignore` lists `main.js`**, though both `bun fmt` scripts glob only `**/*.md`
-  and could never reach it. #84 removed "unreachable ignores" the same day, just before #85
-  added this file. I read this as protection for a hand-run `bun fmt .` or an editor
-  integration, not an oversight, but I am not certain.
+- **`bunfig.toml`'s `[fmt]` ignore patterns list `main.js`**, though both `bun fmt` scripts
+  glob only `**/*.md` and could never reach it. #84 removed "unreachable ignores" the same
+  day, just before #85 added the entry. I read this as protection for a hand-run
+  `bun fmt .` or an editor integration, not an oversight, but I am not certain.
 - **The method `ExamplePlugin.greet` and the imported function `greet` share a name.** Inside
   the method, `greet(...)` resolves to the module import, which is correct but reads like
   recursion. I cannot tell whether the shared name is a deliberate "the method is the
