@@ -87,10 +87,10 @@ Biome checks every file git does not ignore, except the minified `main.js`
 new top-level `.ts` file is linted but not typechecked until it is added there.
 
 Biome 2.6 formats Markdown too; `biome.json` turns that off (`markdown.formatter.enabled:
-false`) because its list spacing disagrees with the Prettier style `bun fmt` follows, which
-left no Markdown passing both.
+false`) because its list spacing disagrees with `bun fmt`'s, which left no Markdown passing
+both.
 
-`bun fmt` owns Markdown only (`"**/*.md"` in the `check` and `lint:fix` scripts), with
-`proseWrap: preserve` from `.prettierrc.json`, which it reads as Prettier would;
-`.prettierignore` keeps it out of `main.js` and `.issues/`. Never add a `fmt` script to
+`bun fmt` owns Markdown only (`"**/*.md"` in the `check` and `lint:fix` scripts), on its
+defaults, which preserve prose wrap; the `[fmt]` table in `bunfig.toml` keeps it out of
+`main.js`. Never add a `fmt` script to
 `package.json`: `bun fmt` would run that script instead of formatting.

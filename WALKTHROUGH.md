@@ -44,10 +44,9 @@ Nothing reads a committed copy, so `main.js` is gitignored.
 ├── main.js               # Built bundle — gitignored, Obsidian loads this
 ├── manifest.json         # Obsidian plugin manifest
 ├── versions.json         # plugin version -> minimum Obsidian version
-├── bunfig.toml           # Registers the test preload
+├── bunfig.toml           # Test preload, and bun fmt settings for Markdown
 ├── tsconfig.json         # strict TypeScript, checker only
-├── biome.json            # Lint + format for code and JSON
-└── .prettierrc.json      # Markdown format config, read by bun fmt
+└── biome.json            # Lint + format for code and JSON
 ```
 
 Data flows one way: `src/*.ts` → `bun build` → `main.js` → your vault (through `deploy.ts`)
